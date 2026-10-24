@@ -1,5 +1,5 @@
 import { Wallet } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useState, type CSSProperties, type FormEvent } from 'react'
 import { errorText, supabase } from '../lib/supabase'
 
 export function Auth() {
@@ -28,48 +28,51 @@ export function Auth() {
   }
 
   return (
-    <form className="center-page" onSubmit={submit}>
-      <div className="logo">
-        <span className="coin">
-          <Wallet size={34} />
-        </span>
-        <h1>BudjetKeeper</h1>
-      </div>
+    <div className="center-page">
+      <form className="auth-card glass" onSubmit={submit}>
+        <div className="logo">
+          <span className="orb solid" style={{ '--c': '#cc785c' } as CSSProperties}>
+            <Wallet strokeWidth={2} />
+          </span>
+          <h1>BudjetKeeper</h1>
+          <p>Общий бюджет на двоих</p>
+        </div>
 
-      <div className="tabs">
-        <button type="button" className={mode === 'signIn' ? 'on' : ''} onClick={() => setMode('signIn')}>
-          Вход
-        </button>
-        <button type="button" className={mode === 'signUp' ? 'on' : ''} onClick={() => setMode('signUp')}>
-          Регистрация
-        </button>
-      </div>
+        <div className="segmented">
+          <button type="button" className={mode === 'signIn' ? 'on' : ''} onClick={() => setMode('signIn')}>
+            Вход
+          </button>
+          <button type="button" className={mode === 'signUp' ? 'on' : ''} onClick={() => setMode('signUp')}>
+            Регистрация
+          </button>
+        </div>
 
-      <label className="field">
-        <span>Email</span>
-        <input className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-      </label>
-      <label className="field">
-        <span>Пароль</span>
-        <input
-          className="input"
-          type="password"
-          autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
-          minLength={6}
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </label>
+        <label className="field">
+          <span>Email</span>
+          <input className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        <label className="field">
+          <span>Пароль</span>
+          <input
+            className="input"
+            type="password"
+            autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
+            minLength={6}
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
 
-      {error && <p className="error">{error}</p>}
-      {info && <p className="hint">{info}</p>}
+        {error && <p className="error">{error}</p>}
+        {info && <p className="hint">{info}</p>}
 
-      <div className="btn-row">
-        <button type="submit" className="btn" disabled={busy}>
-          {mode === 'signIn' ? 'Войти' : 'Создать аккаунт'}
-        </button>
-      </div>
-    </form>
+        <div className="btn-row">
+          <button type="submit" className="btn" disabled={busy}>
+            {mode === 'signIn' ? 'Войти' : 'Создать аккаунт'}
+          </button>
+        </div>
+      </form>
+    </div>
   )
 }

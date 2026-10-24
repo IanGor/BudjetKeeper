@@ -4,24 +4,28 @@ import { useOnline } from '../hooks/useOnline'
 import { hasOperator, kopecksToInput, pressKey, type Key } from '../lib/keypad'
 import { evalExpression, formatRub } from '../lib/money'
 import { flowLabel } from '../lib/rules'
-import { todayISO } from '../lib/totals'
+import { adjustmentFor, todayISO } from '../lib/totals'
 import type { Entity, Transaction } from '../lib/types'
 import { useBudget } from '../store/budget'
-import { CoinFace } from './Coin'
+import { Orb } from './Coin'
 import { Sheet } from './Sheet'
 
 interface Props {
-  from: Entity
-  to: Entity
+  /** null on one side = balance adjustment */
+  from: Entity | null
+  to: Entity | null
   /** existing transaction when editing */
   tx?: Transaction
+  /** "set balance" mode: the entered value is the account's new balance */
+  balance?: { account: Entity; current: number }
   onClose(): void
 }
 
 const KEYS: Key[] = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', ',', '0', 'back', '+']
 const KEYBOARD: Record<string, Key> = { '.': ',', ',': ',', '+': '+', '-': '−', '*': '×', '/': '÷', Backspace: 'back' }
+const ADJUSTMENT = 'Корректировка'
 
-export function AmountSheet({ from, to, tx, onClose }: Props) {
+export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
   const [expr, setExpr] = useState(tx ? kopecksToInput(tx.amount_kopecks) : '')
   const [date, setDate] = useState(tx?.occurred_at ?? todayISO())
   const [comment, setComment] = useState(tx?.comment ?? '')
@@ -32,15 +36,27 @@ export function AmountSheet({ from, to, tx, onClose }: Props) {
   const deleteTransaction = useBudget((s) => s.deleteTransaction)
 
   const amount = evalExpression(expr)
-  const valid = amount !== null && amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date)
+  const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date)
+  const delta = balance && amount !== null ? amount - balance.current : 0
+  const valid = dateOk && amount !== null && (balance ? delta !== 0 : amount > 0)
+
+  const isAdjustment = !balance && (from === null || to === null)
+  const account = balance?.account ?? (isAdjustment ? (from ?? to) : null)
+  const title = balance ? 'Баланс счёта' : isAdjustment ? ADJUSTMENT : flowLabel(from!.kind, to!.kind)
 
   // Totals are updated optimistically by the store, so the sheet closes at once;
   // a failed write is rolled back there and reported with a toast.
   const submit = () => {
-    if (!valid || !online) return
-    const fields = { amount_kopecks: amount, occurred_at: date, comment: comment.trim() || null }
-    if (tx) void updateTransaction(tx, fields)
-    else void addTransaction({ from_id: from.id, to_id: to.id, ...fields })
+    if (!valid || !online || amount === null) return
+    const note = comment.trim() || null
+    if (balance) {
+      const adj = adjustmentFor(balance.account.id, balance.current, amount)
+      if (adj) void addTransaction({ ...adj, occurred_at: date, comment: note ?? ADJUSTMENT })
+    } else if (tx) {
+      void updateTransaction(tx, { amount_kopecks: amount, occurred_at: date, comment: note })
+    } else {
+      void addTransaction({ from_id: from!.id, to_id: to!.id, amount_kopecks: amount, occurred_at: date, comment: note })
+    }
     onClose()
   }
 
@@ -74,22 +90,55 @@ export function AmountSheet({ from, to, tx, onClose }: Props) {
   })
 
   return (
-    <Sheet title={tx ? `${flowLabel(from.kind, to.kind)} · изменить` : flowLabel(from.kind, to.kind)} onClose={onClose}>
-      <div className="flow">
-        <div className="side">
-          <CoinFace entity={from} />
-          <span>{from.name}</span>
+    <Sheet title={title} subtitle={tx ? 'Изменение операции' : undefined} onClose={onClose}>
+      {account ? (
+        <div className="flow">
+          <div className="side">
+            <Orb entity={account} />
+            <span>{account.name}</span>
+          </div>
+          <div className="flow-note">
+            {balance ? (
+              <>
+                <span>Сейчас</span>
+                <strong className="num">{formatRub(balance.current)}</strong>
+              </>
+            ) : (
+              <>
+                <span>Корректировка</span>
+                <strong>{to ? 'увеличение' : 'уменьшение'}</strong>
+              </>
+            )}
+          </div>
         </div>
-        <ArrowRight size={20} />
-        <div className="side">
-          <CoinFace entity={to} />
-          <span>{to.name}</span>
+      ) : (
+        <div className="flow">
+          <div className="side">
+            <Orb entity={from!} />
+            <span>{from!.name}</span>
+          </div>
+          <span className="arrow">
+            <ArrowRight size={18} strokeWidth={2.4} />
+          </span>
+          <div className="side">
+            <Orb entity={to!} />
+            <span>{to!.name}</span>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="display" aria-live="polite">
-        <span className="expr">{hasOperator(expr) ? expr : ''}</span>
-        {amount !== null ? formatRub(amount) : formatRub(0)}
+      <div className="display num" aria-live="polite">
+        <span className="expr">{hasOperator(expr) ? expr : balance ? 'Новый баланс' : ''}</span>
+        {amount !== null ? (
+          formatRub(amount)
+        ) : (
+          <span className="placeholder">{formatRub(balance ? balance.current : 0)}</span>
+        )}
+        {balance && amount !== null && (
+          <span className={`delta${delta < 0 ? ' neg' : ''}`}>
+            {delta === 0 ? 'Без изменений' : `${formatRub(delta, true)} будет записано как корректировка`}
+          </span>
+        )}
       </div>
 
       <div className="inline">
@@ -103,7 +152,7 @@ export function AmountSheet({ from, to, tx, onClose }: Props) {
             className="input"
             value={comment}
             maxLength={200}
-            placeholder="необязательно"
+            placeholder={balance || isAdjustment ? ADJUSTMENT : 'необязательно'}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
@@ -122,7 +171,7 @@ export function AmountSheet({ from, to, tx, onClose }: Props) {
             {k === 'back' ? <Delete size={22} /> : k}
           </button>
         ))}
-        <button type="button" className="key done" style={{ gridColumn: 'span 4' }} disabled={!valid || !online} onClick={submit}>
+        <button type="button" className="key done" disabled={!valid || !online} onClick={submit}>
           {online ? 'Готово' : 'Нет связи'}
         </button>
       </div>

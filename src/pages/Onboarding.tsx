@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { Users } from 'lucide-react'
+import { useState, type CSSProperties, type FormEvent } from 'react'
 import { errorText, supabase } from '../lib/supabase'
 import { useBudget } from '../store/budget'
 
@@ -29,61 +30,67 @@ export function Onboarding() {
   }
 
   return (
-    <form className="center-page" onSubmit={submit}>
-      <div className="logo">
-        <h1>Общий бюджет</h1>
-      </div>
+    <div className="center-page">
+      <form className="auth-card glass" onSubmit={submit}>
+        <div className="logo">
+          <span className="orb solid" style={{ '--c': '#cc785c' } as CSSProperties}>
+            <Users strokeWidth={2} />
+          </span>
+          <h1>Общий бюджет</h1>
+          <p>Создайте новый или присоединитесь по коду</p>
+        </div>
 
-      <div className="tabs">
-        <button type="button" className={mode === 'create' ? 'on' : ''} onClick={() => setMode('create')}>
-          Создать
-        </button>
-        <button type="button" className={mode === 'join' ? 'on' : ''} onClick={() => setMode('join')}>
-          Присоединиться
-        </button>
-      </div>
+        <div className="segmented">
+          <button type="button" className={mode === 'create' ? 'on' : ''} onClick={() => setMode('create')}>
+            Создать
+          </button>
+          <button type="button" className={mode === 'join' ? 'on' : ''} onClick={() => setMode('join')}>
+            Присоединиться
+          </button>
+        </div>
 
-      <label className="field">
-        <span>Ваше имя</span>
-        <input className="input" required maxLength={40} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-      </label>
-
-      {mode === 'create' ? (
         <label className="field">
-          <span>Название бюджета</span>
-          <input className="input" required maxLength={60} value={householdName} onChange={(e) => setHouseholdName(e.target.value)} />
+          <span>Ваше имя</span>
+          <input className="input" required maxLength={40} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
         </label>
-      ) : (
-        <label className="field">
-          <span>Код приглашения</span>
-          <input
-            className="input"
-            required
-            autoCapitalize="characters"
-            autoComplete="off"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-          />
-        </label>
-      )}
 
-      {error && <p className="error">{error}</p>}
+        {mode === 'create' ? (
+          <label className="field">
+            <span>Название бюджета</span>
+            <input className="input" required maxLength={60} value={householdName} onChange={(e) => setHouseholdName(e.target.value)} />
+          </label>
+        ) : (
+          <label className="field">
+            <span>Код приглашения</span>
+            <input
+              className="input"
+              required
+              autoCapitalize="characters"
+              autoComplete="off"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+            />
+          </label>
+        )}
 
-      <div className="btn-row">
-        <button type="submit" className="btn" disabled={busy}>
-          {mode === 'create' ? 'Создать бюджет' : 'Присоединиться'}
-        </button>
-      </div>
-      <p className="hint">
-        {mode === 'create'
-          ? 'Будут созданы стартовые счета и категории — их можно изменить.'
-          : 'Код есть в настройках у того, кто создал бюджет.'}
-      </p>
-      <p className="hint">
-        <button type="button" className="link" onClick={() => void supabase.auth.signOut()}>
-          Выйти
-        </button>
-      </p>
-    </form>
+        {error && <p className="error">{error}</p>}
+
+        <div className="btn-row">
+          <button type="submit" className="btn" disabled={busy}>
+            {mode === 'create' ? 'Создать бюджет' : 'Присоединиться'}
+          </button>
+        </div>
+        <p className="hint">
+          {mode === 'create'
+            ? 'Будут созданы стартовые счета и категории — их можно изменить.'
+            : 'Код есть в настройках у того, кто создал бюджет.'}
+        </p>
+        <p className="hint">
+          <button type="button" className="link" onClick={() => void supabase.auth.signOut()}>
+            Выйти
+          </button>
+        </p>
+      </form>
+    </div>
   )
 }

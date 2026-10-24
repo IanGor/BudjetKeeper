@@ -15,8 +15,8 @@ export interface EntityInput {
 }
 
 export interface TransactionInput {
-  from_id: string
-  to_id: string
+  from_id: string | null
+  to_id: string | null
   amount_kopecks: number
   comment: string | null
   occurred_at: string

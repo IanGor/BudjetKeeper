@@ -30,10 +30,12 @@ export function iconFor(name: string): LucideIcon {
   return ICONS[name] ?? Tag
 }
 
-export const COLORS = ['#e0b44c', '#d9a441', '#6fbf73', '#4fa3d1', '#9b7fd4', '#e07a5f', '#e85d75', '#5fc1b5', '#b0a596']
+// Warm palette around Claude's coral; readable on both the light and dark canvas.
+// Keep in sync with the remap in supabase/migrations/20261024000002_palette.sql.
+export const COLORS = ['#cc785c', '#e8a55a', '#b59a5b', '#5db872', '#5db8a6', '#6b8fc7', '#9a7bc4', '#d4728a', '#8e8b82']
 
 export const DEFAULT_COLOR: Record<EntityKind, string> = {
-  income: '#6fbf73',
-  account: '#d9a441',
-  expense: '#e0b44c',
+  income: '#5db872',
+  account: '#cc785c',
+  expense: '#e8a55a',
 }

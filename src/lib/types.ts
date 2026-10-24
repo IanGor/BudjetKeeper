@@ -16,8 +16,8 @@ export interface Entity {
 export interface Transaction {
   id: string
   household_id: string
-  from_id: string
-  to_id: string
+  from_id: string | null
+  to_id: string | null
   amount_kopecks: number
   comment: string | null
   occurred_at: string // YYYY-MM-DD

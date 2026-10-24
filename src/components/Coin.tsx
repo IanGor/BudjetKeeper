@@ -1,18 +1,34 @@
 import { Plus } from 'lucide-react'
+import type { CSSProperties } from 'react'
 import { useDrag, useCoinDrag, useDropRole } from '../hooks/useCoinDrag'
 import { iconFor } from '../lib/icons'
 import { formatRubShort } from '../lib/money'
 import { canDragFrom } from '../lib/rules'
 import type { Entity } from '../lib/types'
 
-export function CoinFace({ entity, level = 0, over = false }: { entity: Entity; level?: number; over?: boolean }) {
+interface OrbProps {
+  entity: Entity
+  /** plan fulfilment 0..n; draws a ring when set */
+  progress?: number
+  over?: boolean
+}
+
+/** Income sources and accounts are solid drops of their color; categories are tinted glass. */
+export function Orb({ entity, progress, over = false }: OrbProps) {
   const Icon = iconFor(entity.icon)
-  const expense = entity.kind === 'expense'
+  const value = progress === undefined ? 0 : Math.min(Math.max(progress, 0), 1) * 100
   return (
-    <span className={`coin${expense ? ' expense' : ''}${over ? ' over-plan' : ''}`}>
-      {expense && level > 0 && <span className="level" style={{ height: `${Math.min(level, 1) * 100}%` }} />}
-      {!expense && <span className="tint" style={{ background: entity.color }} />}
-      <Icon size={26} strokeWidth={1.8} color={expense ? entity.color : undefined} />
+    <span
+      className={`orb ${entity.kind === 'expense' ? 'tinted' : 'solid'}`}
+      style={{ '--c': entity.color } as CSSProperties}
+    >
+      {progress !== undefined && (
+        <svg className={`ring${over ? ' over' : ''}`} viewBox="0 0 68 68" aria-hidden="true">
+          <circle className="track" cx="34" cy="34" r="32" />
+          {value > 0 && <circle className="value" cx="34" cy="34" r="32" pathLength={100} strokeDasharray={`${value} 100`} />}
+        </svg>
+      )}
+      <Icon strokeWidth={2} />
     </span>
   )
 }
@@ -29,8 +45,8 @@ export function Coin({ entity, total, entities, onTap, onDrop }: CoinProps) {
   const ref = useCoinDrag({ entity, entities, onTap, onDrop })
   const role = useDropRole(entity)
   const plan = entity.plan_kopecks
-  const level = entity.kind === 'expense' && plan ? total / plan : 0
-  const over = entity.kind === 'expense' && plan != null && total > plan
+  const hasPlan = plan != null && plan > 0
+  const over = entity.kind === 'expense' && hasPlan && total > plan
 
   return (
     <button
@@ -41,10 +57,10 @@ export function Coin({ entity, total, entities, onTap, onDrop }: CoinProps) {
       // pointer taps are handled by the drag hook; this keeps keyboard access
       onClick={(e) => e.detail === 0 && onTap(entity)}
     >
+      <Orb entity={entity} progress={hasPlan ? total / plan : undefined} over={over} />
       <span className="coin-name">{entity.name}</span>
-      <CoinFace entity={entity} level={level} over={over} />
       <span className={`coin-amount${total < 0 ? ' neg' : ''}`}>{formatRubShort(total)}</span>
-      {plan != null && <span className="coin-plan">из {formatRubShort(plan)}</span>}
+      {hasPlan && <span className="coin-plan">из {formatRubShort(plan)}</span>}
     </button>
   )
 }
@@ -52,20 +68,27 @@ export function Coin({ entity, total, entities, onTap, onDrop }: CoinProps) {
 export function AddTile({ label, onClick }: { label: string; onClick(): void }) {
   return (
     <button type="button" className="coin-cell add-tile" onClick={onClick} aria-label={label}>
-      <span className="coin-name">{label}</span>
-      <span className="coin">
-        <Plus size={26} />
+      <span className="orb add">
+        <Plus strokeWidth={2} />
       </span>
+      <span className="coin-name">{label}</span>
     </button>
   )
 }
 
+const ORB = 56
+
 export function DragGhost() {
-  const { source, x, y } = useDrag()
+  const { source, x, y, returning } = useDrag()
   if (!source) return null
+  // lifted above the finger while dragging so the coin stays visible; centered when landing back
+  const dy = returning ? ORB / 2 : ORB * 0.9
   return (
-    <div className="ghost" style={{ left: x, top: y }}>
-      <CoinFace entity={source} />
+    <div
+      className={`ghost${returning ? ' returning' : ''}`}
+      style={{ transform: `translate3d(${x - ORB / 2}px, ${y - dy}px, 0)` }}
+    >
+      <Orb entity={source} />
     </div>
   )
 }

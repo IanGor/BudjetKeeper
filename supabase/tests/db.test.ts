@@ -94,6 +94,27 @@ describe.skipIf(!url || !key)('database', () => {
     }
   })
 
+  it('adjusts an account balance with a one-sided transaction', async () => {
+    const before = (await totals(alice))[ids['Наличные']]
+    const up = await alice.from('transactions').insert({ household_id: hid, from_id: null, to_id: ids['Наличные'], amount_kopecks: 1500 })
+    expect(up.error).toBeNull()
+    const down = await bob.from('transactions').insert({ household_id: hid, from_id: ids['Наличные'], to_id: null, amount_kopecks: 500 })
+    expect(down.error).toBeNull()
+    const t = await totals(alice)
+    expect(t[ids['Наличные']]).toBe(before + 1000)
+    expect(t[ids['Продукты']]).toBe(30000)
+
+    const bad: { household_id: string; from_id: string | null; to_id: string | null; amount_kopecks: number }[] = [
+      { household_id: hid, from_id: null, to_id: ids['Продукты'], amount_kopecks: 100 },
+      { household_id: hid, from_id: ids['Зарплата'], to_id: null, amount_kopecks: 100 },
+      { household_id: hid, from_id: null, to_id: null, amount_kopecks: 100 },
+    ]
+    for (const row of bad) {
+      const { error } = await alice.from('transactions').insert(row)
+      expect(error, JSON.stringify(row)).not.toBeNull()
+    }
+  })
+
   it('does not allow changing an entity kind', async () => {
     const { error } = await alice.from('entities').update({ kind: 'account' }).eq('id', ids['Продукты'])
     expect(error?.message).toMatch(/cannot be changed/)

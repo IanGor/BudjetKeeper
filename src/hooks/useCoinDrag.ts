@@ -8,16 +8,20 @@ interface DragState {
   x: number
   y: number
   overId: string | null
+  /** released over nothing: the ghost travels back to its coin (same path out and in) */
+  returning: boolean
 }
 
-export const useDrag = create<DragState>(() => ({ source: null, x: 0, y: 0, overId: null }))
+export const useDrag = create<DragState>(() => ({ source: null, x: 0, y: 0, overId: null, returning: false }))
+
+export const RETURN_MS = 340
 
 export type DropRole = 'source' | 'over' | 'valid' | 'invalid' | null
 
 /** How a coin should look while something is being dragged. */
 export function useDropRole(entity: Entity): DropRole {
   return useDrag((s) => {
-    if (!s.source) return null
+    if (!s.source || s.returning) return s.source?.id === entity.id ? 'source' : null
     if (s.source.id === entity.id) return 'source'
     if (!canFlow(s.source.kind, entity.kind)) return 'invalid'
     return s.overId === entity.id ? 'over' : 'valid'
@@ -60,14 +64,19 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
     let moved = false
     let pressTimer = 0
     let edgeTimer = 0
+    let returnTimer = 0
     let edgeKey = ''
+
+    let lastOver: string | null = null
 
     const activate = (x: number, y: number) => {
       if (active) return
       active = true
+      lastOver = null
       window.clearTimeout(pressTimer)
+      window.clearTimeout(returnTimer)
       navigator.vibrate?.(12)
-      useDrag.setState({ source: opts.current.entity, x, y, overId: null })
+      useDrag.setState({ source: opts.current.entity, x, y, overId: null, returning: false })
     }
 
     const targetAt = (x: number, y: number): Entity | null => {
@@ -99,13 +108,24 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
       }
     }
 
-    const reset = () => {
+    const reset = (clearGhost = true) => {
       window.clearTimeout(pressTimer)
       window.clearInterval(edgeTimer)
       edgeKey = ''
       pointerId = null
-      if (active) useDrag.setState({ source: null, overId: null })
+      if (active && clearGhost) useDrag.setState({ source: null, overId: null, returning: false })
       active = false
+    }
+
+    const returnGhost = () => {
+      const orb = el.querySelector('.orb')?.getBoundingClientRect()
+      if (!orb || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        reset()
+        return
+      }
+      reset(false)
+      useDrag.setState({ x: orb.left + orb.width / 2, y: orb.top + orb.height / 2, overId: null, returning: true })
+      returnTimer = window.setTimeout(() => useDrag.setState({ source: null, returning: false }), RETURN_MS)
     }
 
     const onPointerDown = (e: PointerEvent) => {
@@ -131,7 +151,11 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
         activate(e.clientX, e.clientY)
       }
       const target = targetAt(e.clientX, e.clientY)
-      useDrag.setState({ x: e.clientX, y: e.clientY, overId: target?.id ?? null })
+      const overId = target?.id ?? null
+      // a light tick when the coin snaps onto a new target (Android; iOS has no Vibration API)
+      if (overId && overId !== lastOver) navigator.vibrate?.(5)
+      lastOver = overId
+      useDrag.setState({ x: e.clientX, y: e.clientY, overId })
       edgeScroll(e.clientX, e.clientY)
     }
 
@@ -139,7 +163,13 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
       if (e.pointerId !== pointerId) return
       if (active) {
         const target = targetAt(e.clientX, e.clientY)
-        if (target) opts.current.onDrop(opts.current.entity, target)
+        if (target) {
+          navigator.vibrate?.(10)
+          opts.current.onDrop(opts.current.entity, target)
+        } else {
+          returnGhost()
+          return
+        }
       } else if (!moved) {
         opts.current.onTap(opts.current.entity)
       }
@@ -163,6 +193,7 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
     el.addEventListener('contextmenu', onContextMenu)
     return () => {
       reset()
+      window.clearTimeout(returnTimer)
       el.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointerup', onPointerUp)

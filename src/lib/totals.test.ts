@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyTransaction, inMonth, monthStart, todayISO } from './totals'
+import { adjustmentFor, applyTransaction, inMonth, monthStart, todayISO } from './totals'
 import type { Entity, EntityKind } from './types'
 
 const ent = (id: string, kind: EntityKind) => ({ id, kind }) as Entity
@@ -40,9 +40,26 @@ describe('applyTransaction', () => {
     const t = applyTransaction({}, entities, { from_id: 'card', to_id: 'food', amount_kopecks: 700, occurred_at: '2026-09-30' }, month)
     expect(t).toEqual({ card: -700 })
   })
+  it('balance adjustment changes only the account', () => {
+    const up = applyTransaction({ card: 1000 }, entities, { from_id: null, to_id: 'card', amount_kopecks: 250, occurred_at: '2026-10-05' }, month)
+    expect(up).toEqual({ card: 1250 })
+    const down = applyTransaction(up, entities, { from_id: 'card', to_id: null, amount_kopecks: 1250, occurred_at: '2026-10-05' }, month)
+    expect(down).toEqual({ card: 0 })
+  })
   it('sign -1 reverts', () => {
     const tx = { from_id: 'card', to_id: 'food', amount_kopecks: 700, occurred_at: '2026-10-01' }
     const t = applyTransaction(applyTransaction({ card: 1000 }, entities, tx, month), entities, tx, month, -1)
     expect(t).toEqual({ card: 1000, food: 0 })
+  })
+})
+
+describe('adjustmentFor', () => {
+  it('records the difference on the right side', () => {
+    expect(adjustmentFor('card', 1000, 1500)).toEqual({ from_id: null, to_id: 'card', amount_kopecks: 500 })
+    expect(adjustmentFor('card', 1000, 0)).toEqual({ from_id: 'card', to_id: null, amount_kopecks: 1000 })
+    expect(adjustmentFor('card', -300, 0)).toEqual({ from_id: null, to_id: 'card', amount_kopecks: 300 })
+  })
+  it('returns null when the balance is unchanged', () => {
+    expect(adjustmentFor('card', 700, 700)).toBeNull()
   })
 })

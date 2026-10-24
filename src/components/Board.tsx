@@ -1,7 +1,7 @@
-import { ChevronDown, ChevronUp, Settings as SettingsIcon } from 'lucide-react'
+import { ChevronDown, Settings2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRealtime } from '../hooks/useRealtime'
-import { formatRub, formatRubShort } from '../lib/money'
+import { formatRub } from '../lib/money'
 import type { Entity, EntityKind } from '../lib/types'
 import { selectKind, useBudget } from '../store/budget'
 import { AmountSheet } from './AmountSheet'
@@ -24,7 +24,7 @@ function writeFlag(key: string, value: boolean) {
   try {
     localStorage.setItem(key, value ? '1' : '0')
   } catch {
-    // storage unavailable (private mode) — the drawer just won't remember its state
+    // storage unavailable (private mode) — the section just won't remember its state
   }
 }
 
@@ -33,6 +33,7 @@ export function Board() {
   const entities = useBudget((s) => s.entities)
   const totals = useBudget((s) => s.totals)
   const month = useBudget((s) => s.month)
+  const householdName = useBudget((s) => s.household?.name)
 
   const [flow, setFlow] = useState<{ from: Entity; to: Entity } | null>(null)
   const [openedId, setOpenedId] = useState<string | null>(null)
@@ -65,55 +66,53 @@ export function Board() {
 
   return (
     <div className="board">
-      <section className="income">
-        <div className="income-body" style={{ maxHeight: incomeOpen ? 160 : 0 }}>
-          <div className="section-title">Доходы</div>
-          <div className="row" data-drag-scroll="income">
-            {incomes.map(coin)}
-            <AddTile label="Источник" onClick={() => setCreating('income')} />
+      <header className="topbar">
+        <div className="titles">
+          <div className="eyebrow">{householdName}</div>
+          <h1 className="large-title">{MONTHS[Number(month.slice(5, 7)) - 1]}</h1>
+        </div>
+        <button type="button" className="circle-btn glass" onClick={() => setSettings(true)} aria-label="Настройки">
+          <Settings2 size={21} strokeWidth={2} />
+        </button>
+      </header>
+
+      <section className="card glass">
+        <button type="button" className="card-head" onClick={toggleIncome} aria-expanded={incomeOpen}>
+          <span className="card-title">Доходы</span>
+          <span className="card-meta">{formatRub(incomeSum)}</span>
+          <ChevronDown size={18} className={`chevron${incomeOpen ? ' open' : ''}`} />
+        </button>
+        <div className={`collapse${incomeOpen ? ' open' : ''}`}>
+          <div>
+            <div className="row" data-drag-scroll="income">
+              {incomes.map(coin)}
+              <AddTile label="Источник" onClick={() => setCreating('income')} />
+            </div>
           </div>
         </div>
-        <button type="button" className="income-tab" onClick={toggleIncome}>
-          {incomeOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          {incomeOpen ? 'Свернуть' : `Доходы · ${formatRubShort(incomeSum)} ₽`}
-        </button>
       </section>
 
-      <section className="accounts">
-        <div className="section-title">Счета · {formatRub(balance)}</div>
+      <section className="card glass">
+        <div className="card-head">
+          <span className="card-title">Счета</span>
+          <span className={`card-meta${balance < 0 ? ' neg' : ''}`}>{formatRub(balance)}</span>
+        </div>
         <div className="row" data-drag-scroll="accounts">
           {accounts.map(coin)}
           <AddTile label="Счёт" onClick={() => setCreating('account')} />
         </div>
       </section>
 
-      <section className="expenses">
-        <div className="section-title">Расходы</div>
+      <section className="card glass expenses-card">
+        <div className="card-head">
+          <span className="card-title">Расходы</span>
+          <span className="card-meta">{formatRub(expenseSum)}</span>
+        </div>
         <CategoryPager
           items={expenses.map(coin)}
           add={<AddTile key="add" label="Категория" onClick={() => setCreating('expense')} />}
         />
       </section>
-
-      <footer className="bottom-bar">
-        <button type="button" className="icon-btn" onClick={() => setSettings(true)} aria-label="Настройки">
-          <SettingsIcon size={20} />
-        </button>
-        <div>
-          <span className="label">Месяц</span>
-          {MONTHS[Number(month.slice(5, 7)) - 1]}
-        </div>
-        <div className="sum">
-          <div>
-            <span className="label">Доходы</span>
-            {formatRub(incomeSum)}
-          </div>
-          <div>
-            <span className="label">Расходы</span>
-            {formatRub(expenseSum)}
-          </div>
-        </div>
-      </footer>
 
       <DragGhost />
       {flow && <AmountSheet from={flow.from} to={flow.to} onClose={() => setFlow(null)} />}
@@ -124,7 +123,7 @@ export function Board() {
   )
 }
 
-const CELL_HEIGHT = 118 // name + coin + amount + plan + row gap
+const CELL_HEIGHT = 128 // ring + orb + name + amount + plan + row gap
 
 function CategoryPager({ items, add }: { items: ReactNode[]; add: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -136,7 +135,7 @@ function CategoryPager({ items, add }: { items: ReactNode[]; add: ReactNode }) {
     if (!el) return
     const measure = () => {
       const cols = el.clientWidth >= 600 ? 6 : 4
-      const rows = Math.max(1, Math.floor((el.clientHeight - 10) / CELL_HEIGHT))
+      const rows = Math.max(1, Math.floor((el.clientHeight - 8) / CELL_HEIGHT))
       setLayout((prev) => (prev.cols === cols && prev.perPage === cols * rows ? prev : { cols, perPage: cols * rows }))
     }
     measure()

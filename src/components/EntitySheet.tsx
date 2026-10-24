@@ -1,3 +1,4 @@
+import { SlidersHorizontal } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useOnline } from '../hooks/useOnline'
 import { COLORS, DEFAULT_COLOR, ICON_CHOICES, iconFor } from '../lib/icons'
@@ -5,13 +6,16 @@ import { formatRub, parseRub } from '../lib/money'
 import type { Entity, EntityKind, Transaction } from '../lib/types'
 import { useBudget } from '../store/budget'
 import { AmountSheet } from './AmountSheet'
+import { Orb } from './Coin'
 import { Sheet } from './Sheet'
 
 const KIND_LABEL: Record<EntityKind, string> = { income: 'Источник дохода', account: 'Счёт', expense: 'Категория' }
+const NEW_LABEL: Record<EntityKind, string> = { income: 'Новый источник', account: 'Новый счёт', expense: 'Новая категория' }
 
 export function EntitySheet({ entity, onClose }: { entity: Entity; onClose(): void }) {
   const [tab, setTab] = useState<'ops' | 'edit'>('ops')
   const [editing, setEditing] = useState<Transaction | null>(null)
+  const [settingBalance, setSettingBalance] = useState(false)
   const [list, setList] = useState<Transaction[] | null>(null)
   const entities = useBudget((s) => s.entities)
   const members = useBudget((s) => s.members)
@@ -29,15 +33,34 @@ export function EntitySheet({ entity, onClose }: { entity: Entity; onClose(): vo
 
   const author = (id: string | null) => members.find((m) => m.user_id === id)?.display_name
 
+  if (settingBalance) {
+    return (
+      <AmountSheet
+        from={null}
+        to={null}
+        balance={{ account: entity, current: total }}
+        onClose={() => setSettingBalance(false)}
+      />
+    )
+  }
+
   if (editing) {
-    const from = entities[editing.from_id]
-    const to = entities[editing.to_id]
-    if (from && to) return <AmountSheet from={from} to={to} tx={editing} onClose={() => setEditing(null)} />
+    // a null side means a balance adjustment
+    const from = editing.from_id ? entities[editing.from_id] : null
+    const to = editing.to_id ? entities[editing.to_id] : null
+    if (from !== undefined && to !== undefined && (from || to)) {
+      return <AmountSheet from={from} to={to} tx={editing} onClose={() => setEditing(null)} />
+    }
   }
 
   return (
-    <Sheet title={`${entity.name} · ${formatRub(total)}`} onClose={onClose}>
-      <div className="tabs">
+    <Sheet
+      title={entity.name}
+      subtitle={`${KIND_LABEL[entity.kind]} · ${formatRub(total)}${entity.kind === 'account' ? '' : ' за месяц'}`}
+      leading={<Orb entity={entity} />}
+      onClose={onClose}
+    >
+      <div className="segmented">
         <button type="button" className={tab === 'ops' ? 'on' : ''} onClick={() => setTab('ops')}>
           Операции
         </button>
@@ -46,6 +69,12 @@ export function EntitySheet({ entity, onClose }: { entity: Entity; onClose(): vo
         </button>
       </div>
 
+      {tab === 'ops' && entity.kind === 'account' && (
+        <button type="button" className="btn secondary adjust-btn" onClick={() => setSettingBalance(true)}>
+          <SlidersHorizontal size={18} /> Изменить баланс
+        </button>
+      )}
+
       {tab === 'edit' ? (
         <EntityForm kind={entity.kind} entity={entity} onDone={onClose} />
       ) : list === null ? (
@@ -53,32 +82,35 @@ export function EntitySheet({ entity, onClose }: { entity: Entity; onClose(): vo
       ) : list.length === 0 ? (
         <div className="empty">Операций пока нет</div>
       ) : (
-        <ul className="tx-list">
+        <div className="list">
           {list.map((tx) => {
             const incoming = tx.to_id === entity.id
-            const other = entities[incoming ? tx.from_id : tx.to_id]
+            const otherId = incoming ? tx.from_id : tx.to_id
+            const other = otherId ? entities[otherId] : undefined
             // money arriving to an account, or income received from a source, is shown as "+"
             const plus = (incoming && entity.kind === 'account') || entity.kind === 'income'
             const sub = [formatDate(tx.occurred_at), author(tx.created_by), tx.comment].filter(Boolean).join(' · ')
             return (
-              <li key={tx.id}>
-                <button type="button" className="tx" onClick={() => setEditing(tx)}>
-                  <div className="main">
-                    <div>
-                      {incoming ? '← ' : '→ '}
-                      {other?.name ?? '—'}
-                    </div>
-                    <div className="sub">{sub}</div>
-                  </div>
-                  <span className={`amt${plus ? ' in' : ''}`}>
-                    {plus ? '+' : '−'}
-                    {formatRub(tx.amount_kopecks)}
+              <button key={tx.id} type="button" className="list-row tx" onClick={() => setEditing(tx)}>
+                {other ? (
+                  <Orb entity={other} />
+                ) : (
+                  <span className="adjust-icon">
+                    <SlidersHorizontal size={16} />
                   </span>
-                </button>
-              </li>
+                )}
+                <div className="main">
+                  <div>{otherId ? (other?.name ?? '—') : 'Корректировка'}</div>
+                  <div className="sub">{sub}</div>
+                </div>
+                <span className={`amt${plus ? ' in' : ''}`}>
+                  {plus ? '+' : '−'}
+                  {formatRub(tx.amount_kopecks)}
+                </span>
+              </button>
             )
           })}
-        </ul>
+        </div>
       )}
     </Sheet>
   )
@@ -86,7 +118,7 @@ export function EntitySheet({ entity, onClose }: { entity: Entity; onClose(): vo
 
 export function EntityEditor({ kind, onClose }: { kind: EntityKind; onClose(): void }) {
   return (
-    <Sheet title={`Новый: ${KIND_LABEL[kind].toLowerCase()}`} onClose={onClose}>
+    <Sheet title={NEW_LABEL[kind]} onClose={onClose}>
       <EntityForm kind={kind} onDone={onClose} />
     </Sheet>
   )
