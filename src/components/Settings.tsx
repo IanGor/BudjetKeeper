@@ -25,6 +25,8 @@ export function Settings({ onClose }: { onClose(): void }) {
   const [name, setName] = useState(me?.display_name ?? '')
   const [copied, setCopied] = useState(false)
 
+  // the code is useless once the budget is full; it reappears when max_members is raised
+  const full = !household || members.length >= household.max_members
   const archived = Object.values(entities).filter((e) => e.archived)
 
   const copy = async () => {
@@ -68,22 +70,26 @@ export function Settings({ onClose }: { onClose(): void }) {
         </div>
       </div>
 
-      <div className="field">
-        <span>Код приглашения</span>
-        <div className="list">
-          <div className="list-row">
-            <span className="invite">{household?.invite_code}</span>
-            <button type="button" className="btn secondary small" onClick={copy}>
-              {copied ? <Check size={16} /> : <Copy size={16} />}
-              {copied ? 'Готово' : 'Копировать'}
-            </button>
+      {!full && (
+        <div className="field">
+          <span>Код приглашения</span>
+          <div className="list">
+            <div className="list-row">
+              <span className="invite">{household?.invite_code}</span>
+              <button type="button" className="btn secondary small" onClick={copy}>
+                {copied ? <Check size={16} /> : <Copy size={16} />}
+                {copied ? 'Готово' : 'Копировать'}
+              </button>
+            </div>
           </div>
+          <p className="hint">Новый участник входит, выбирает «Присоединиться» и вводит этот код.</p>
         </div>
-        <p className="hint">Второй участник регистрируется, выбирает «Присоединиться» и вводит этот код.</p>
-      </div>
+      )}
 
       <div className="field">
-        <span>Участники</span>
+        <span>
+          Участники · {members.length} из {household?.max_members ?? members.length}
+        </span>
         <div className="list">
           {members.map((m) => (
             <div key={m.user_id} className="list-row">
@@ -98,7 +104,7 @@ export function Settings({ onClose }: { onClose(): void }) {
         <span>Ваше имя</span>
         <div className="inline">
           <input className="input" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
-          <button type="button" className="btn secondary small" style={{ height: 48 }} onClick={saveName}>
+          <button type="button" className="btn secondary small" onClick={saveName}>
             Сохранить
           </button>
         </div>

@@ -29,6 +29,7 @@ export interface Household {
   id: string
   name: string
   invite_code: string
+  max_members: number
 }
 
 export interface Member {

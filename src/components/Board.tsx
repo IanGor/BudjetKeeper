@@ -1,5 +1,5 @@
-import { ChevronDown, Settings2, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ChevronDown, Settings2, Star, X } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { orderedKind, stopEditing, useArrange } from '../hooks/useArrange'
 import { useFlip } from '../hooks/useFlip'
 import { useRealtime } from '../hooks/useRealtime'
@@ -110,23 +110,26 @@ export function Board() {
       <header className="topbar">
         <div className="titles">
           <div className="eyebrow">{editing ? 'Изменение порядка' : householdName}</div>
-          <h1 className="large-title">{MONTHS[Number(month.slice(5, 7)) - 1]}</h1>
+          <h1 className="large-title">
+            <Star aria-hidden="true" />
+            {MONTHS[Number(month.slice(5, 7)) - 1]}
+          </h1>
         </div>
         {editing ? (
-          <button type="button" className="done-btn glass" onClick={stopEditing}>
+          <button type="button" className="done-btn" onClick={stopEditing}>
             Готово
           </button>
         ) : (
-          <button type="button" className="circle-btn glass" onClick={() => setSettings(true)} aria-label="Настройки">
-            <Settings2 size={21} strokeWidth={2} />
+          <button type="button" className="circle-btn" onClick={() => setSettings(true)} aria-label="Настройки">
+            <Settings2 size={18} strokeWidth={2} />
           </button>
         )}
       </header>
 
-      <section className="card glass">
-        <button type="button" className="card-head" onClick={toggleIncome} aria-expanded={incomeOpen}>
-          <span className="card-title">Доходы</span>
-          <span className="card-meta">{formatRub(incomeSum)}</span>
+      <section className="section">
+        <button type="button" className="section-head" onClick={toggleIncome} aria-expanded={incomeOpen}>
+          <span className="section-title">Доходы</span>
+          <span className="section-meta">{formatRub(incomeSum)}</span>
           <ChevronDown size={18} className={`chevron${incomeOpen ? ' open' : ''}`} />
         </button>
         <div className={`collapse${incomeOpen ? ' open' : ''}`}>
@@ -139,10 +142,10 @@ export function Board() {
         </div>
       </section>
 
-      <section className="card glass">
-        <div className="card-head">
-          <span className="card-title">Счета</span>
-          <span className={`card-meta${balance < 0 ? ' neg' : ''}`}>{formatRub(balance)}</span>
+      <section className="section">
+        <div className="section-head">
+          <span className="section-title">Счета</span>
+          <span className={`section-meta${balance < 0 ? ' neg' : ''}`}>{formatRub(balance)}</span>
         </div>
         <div className="row" data-drag-scroll="accounts">
           {accounts.map(coin)}
@@ -150,10 +153,10 @@ export function Board() {
         </div>
       </section>
 
-      <section className="card glass expenses-card">
-        <div className="card-head">
-          <span className="card-title">Расходы</span>
-          <span className="card-meta">{formatRub(expenseSum)}</span>
+      <section className="section expenses">
+        <div className="section-head">
+          <span className="section-title">Расходы</span>
+          <span className="section-meta">{formatRub(expenseSum)}</span>
         </div>
         <CategoryPager items={[...expenses.map(coin), add('expense', 'Категория')].filter(Boolean)} />
       </section>
@@ -167,31 +170,39 @@ export function Board() {
   )
 }
 
-const CELL_HEIGHT = 128 // ring + orb + name + amount + plan + row gap (4px)
-
 /**
  * Categories in pages of cols×rows. All cells share one grid parent and are
  * placed page by page, so a coin dragged to another page keeps its element
  * (no remount mid-gesture) and glides there.
+ *
+ * Rows are fitted to the space that is left: the height of a coin is measured
+ * (fonts and line heights differ between iOS and Android), as many rows as fit
+ * are used, and the spare height is spread between them.
  */
 function CategoryPager({ items }: { items: ReactNode[] }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [layout, setLayout] = useState({ cols: 4, rows: 4 })
+  const [layout, setLayout] = useState({ cols: 4, rows: 3, rowHeight: 0 })
   const [page, setPage] = useState(0)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const measure = () => {
+      let cell = 0
+      el.querySelectorAll<HTMLElement>('.coin-cell').forEach((c) => (cell = Math.max(cell, c.offsetHeight)))
+      if (!cell || !el.clientHeight) return
       const cols = el.clientWidth >= 600 ? 6 : 4
-      const rows = Math.max(1, Math.floor((el.clientHeight - 8) / CELL_HEIGHT))
-      setLayout((prev) => (prev.cols === cols && prev.rows === rows ? prev : { cols, rows }))
+      const rows = Math.max(1, Math.floor(el.clientHeight / cell))
+      const rowHeight = Math.max(cell, Math.floor(el.clientHeight / rows))
+      setLayout((prev) =>
+        prev.cols === cols && prev.rows === rows && prev.rowHeight === rowHeight ? prev : { cols, rows, rowHeight },
+      )
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [items.length])
 
   const { cols, rows } = layout
   const perPage = cols * rows
@@ -206,7 +217,7 @@ function CategoryPager({ items }: { items: ReactNode[] }) {
         style={{
           gridTemplateColumns: `repeat(${pages * cols}, calc(100% / ${cols}))`,
           // pages share row tracks; fixed rows keep a tall cell on one page from stretching the others
-          gridAutoRows: `${CELL_HEIGHT - 4}px`,
+          gridAutoRows: layout.rowHeight ? `${layout.rowHeight}px` : 'min-content',
         }}
         onScroll={(e) => setPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
       >

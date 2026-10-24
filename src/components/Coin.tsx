@@ -14,7 +14,7 @@ interface OrbProps {
   over?: boolean
 }
 
-/** Income sources and accounts are solid drops of their color; categories are tinted glass. */
+/** Income sources and accounts are flat discs of their color; categories are a light tint with a colored glyph. */
 export function Orb({ entity, progress, over = false }: OrbProps) {
   const Icon = iconFor(entity.icon)
   const value = progress === undefined ? 0 : Math.min(Math.max(progress, 0), 1) * 100
@@ -77,7 +77,7 @@ export function AddTile({ label, onClick }: { label: string; onClick(): void }) 
   )
 }
 
-const ORB = 56
+const ORB = 52 // --orb in styles.css
 
 export function DragGhost() {
   const { source, x, y, returning } = useDrag()

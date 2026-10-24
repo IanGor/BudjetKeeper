@@ -1,17 +1,23 @@
 // Integration tests against the local Supabase stack (`npx supabase start`).
-// Skipped when VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set (.env.local).
+// Skipped when VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY are not set (.env.local).
+// Sign-ups are closed (config.toml), so test users are created with the admin API.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-const client = () => createClient(url!, key!, { auth: { persistSession: false, autoRefreshToken: false } })
+const opts = { auth: { persistSession: false, autoRefreshToken: false } }
+const client = () => createClient(url!, key!, opts)
 
 async function signUp(name: string): Promise<SupabaseClient> {
-  const c = client()
   const email = `${name}-${crypto.randomUUID().slice(0, 8)}@test.local`
-  const { error } = await c.auth.signUp({ email, password: 'password123' })
+  const admin = createClient(url!, serviceKey!, opts)
+  const created = await admin.auth.admin.createUser({ email, password: 'password123', email_confirm: true })
+  if (created.error) throw created.error
+  const c = client()
+  const { error } = await c.auth.signInWithPassword({ email, password: 'password123' })
   if (error) throw error
   return c
 }
@@ -30,7 +36,7 @@ async function totals(c: SupabaseClient): Promise<Record<string, number>> {
   return Object.fromEntries((data as { entity_id: string; total_kopecks: number }[]).map((r) => [r.entity_id, Number(r.total_kopecks)]))
 }
 
-describe.skipIf(!url || !key)('database', () => {
+describe.skipIf(!url || !key || !serviceKey)('database', () => {
   let alice: SupabaseClient
   let bob: SupabaseClient
   let eve: SupabaseClient
@@ -163,6 +169,21 @@ describe.skipIf(!url || !key)('database', () => {
     expect((await bob.rpc('create_household', { p_name: 'x', p_display_name: 'y' })).error?.message).toMatch(/already a member/)
     const stranger = await signUp('stranger')
     expect((await stranger.rpc('join_household', { p_invite_code: 'NOPE', p_display_name: 'z' })).error?.message).toMatch(/not found/)
+  })
+
+  it('keeps a household closed at two members', async () => {
+    const { data: h } = await alice.from('households').select('invite_code, max_members').eq('id', hid).single()
+    expect(h!.max_members).toBe(2)
+    const third = await signUp('third')
+    const { error } = await third.rpc('join_household', { p_invite_code: h!.invite_code, p_display_name: 'Третий' })
+    expect(error?.message).toMatch(/household is full/)
+    const { data: members } = await alice.from('household_members').select('user_id').eq('household_id', hid)
+    expect(members).toHaveLength(2)
+  })
+
+  it('does not let anyone sign up', async () => {
+    const { error } = await client().auth.signUp({ email: `new-${crypto.randomUUID().slice(0, 8)}@test.local`, password: 'password123' })
+    expect(error?.message).toMatch(/signups not allowed|disabled/i)
   })
 
   it('denies anonymous access', async () => {

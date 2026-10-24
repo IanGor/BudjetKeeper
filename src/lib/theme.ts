@@ -5,7 +5,7 @@ type Theme = 'light' | 'dark'
 
 // Same key and colors are used by the inline script in index.html (applied before first paint).
 const KEY = 'bk.theme'
-const BAR_COLOR: Record<Theme, string> = { light: '#faf9f5', dark: '#181715' }
+const BAR_COLOR: Record<Theme, string> = { light: '#ffffff', dark: '#1c1d20' }
 
 const media = window.matchMedia('(prefers-color-scheme: dark)')
 const listeners = new Set<() => void>()

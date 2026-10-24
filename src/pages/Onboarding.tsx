@@ -31,9 +31,9 @@ export function Onboarding() {
 
   return (
     <div className="center-page">
-      <form className="auth-card glass" onSubmit={submit}>
+      <form className="auth-card" onSubmit={submit}>
         <div className="logo">
-          <span className="orb solid" style={{ '--c': '#cc785c' } as CSSProperties}>
+          <span className="orb solid" style={{ '--c': '#2b7cf2' } as CSSProperties}>
             <Users strokeWidth={2} />
           </span>
           <h1>Общий бюджет</h1>

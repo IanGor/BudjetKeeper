@@ -2,49 +2,31 @@ import { Wallet } from 'lucide-react'
 import { useState, type CSSProperties, type FormEvent } from 'react'
 import { errorText, supabase } from '../lib/supabase'
 
+// Sign-ups are closed on the server (the budget is for two people), so only sign-in is offered.
 export function Auth() {
-  const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [info, setInfo] = useState<string | null>(null)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    setInfo(null)
-    if (mode === 'signIn') {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-      if (error) setError(errorText(error))
-    } else {
-      const { data, error } = await supabase.auth.signUp({ email: email.trim(), password })
-      if (error) setError(errorText(error))
-      // email confirmation enabled on the project: no session until the link is opened
-      else if (!data.session) setInfo('Мы отправили письмо со ссылкой. Подтвердите email и войдите.')
-    }
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+    if (error) setError(errorText(error))
     setBusy(false)
   }
 
   return (
     <div className="center-page">
-      <form className="auth-card glass" onSubmit={submit}>
+      <form className="auth-card" onSubmit={submit}>
         <div className="logo">
-          <span className="orb solid" style={{ '--c': '#cc785c' } as CSSProperties}>
+          <span className="orb solid" style={{ '--c': '#2b7cf2' } as CSSProperties}>
             <Wallet strokeWidth={2} />
           </span>
           <h1>BudjetKeeper</h1>
           <p>Общий бюджет на двоих</p>
-        </div>
-
-        <div className="segmented">
-          <button type="button" className={mode === 'signIn' ? 'on' : ''} onClick={() => setMode('signIn')}>
-            Вход
-          </button>
-          <button type="button" className={mode === 'signUp' ? 'on' : ''} onClick={() => setMode('signUp')}>
-            Регистрация
-          </button>
         </div>
 
         <label className="field">
@@ -56,7 +38,7 @@ export function Auth() {
           <input
             className="input"
             type="password"
-            autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
+            autoComplete="current-password"
             minLength={6}
             required
             value={password}
@@ -65,13 +47,13 @@ export function Auth() {
         </label>
 
         {error && <p className="error">{error}</p>}
-        {info && <p className="hint">{info}</p>}
 
         <div className="btn-row">
           <button type="submit" className="btn" disabled={busy}>
-            {mode === 'signIn' ? 'Войти' : 'Создать аккаунт'}
+            Войти
           </button>
         </div>
+        <p className="hint">Регистрация закрыта</p>
       </form>
     </div>
   )

@@ -16,6 +16,8 @@ export function errorText(err: unknown): string {
   if (msg.includes('User already registered')) return 'Такой пользователь уже есть'
   if (msg.includes('Password should be')) return 'Пароль слишком короткий (минимум 6 символов)'
   if (msg.includes('invite code not found')) return 'Код приглашения не найден'
+  if (msg.includes('household is full')) return 'В бюджете уже максимум участников'
+  if (/signups? not allowed|signup_disabled/i.test(msg)) return 'Регистрация закрыта'
   if (msg.includes('already a member')) return 'Вы уже состоите в бюджете'
   if (msg.includes('is not allowed')) return 'Такая операция невозможна'
   if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return 'Нет связи с сервером'

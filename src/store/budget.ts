@@ -110,7 +110,7 @@ export const useBudget = create<BudgetState>((set, get) => {
 
       const hid = me.household_id as string
       const [h, members, entities, totals] = await Promise.all([
-        supabase.from('households').select('id, name, invite_code').eq('id', hid).single(),
+        supabase.from('households').select('id, name, invite_code, max_members').eq('id', hid).single(),
         supabase.from('household_members').select('household_id, user_id, display_name').eq('household_id', hid),
         supabase.from('entities').select('*').eq('household_id', hid).order('position'),
         supabase.rpc('entity_totals', { p_month: month }),
