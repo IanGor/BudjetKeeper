@@ -242,22 +242,17 @@ input, textarea { font: inherit; color: inherit; }
 .pager {
   flex: 1;
   min-height: 0;
-  display: flex;
+  display: grid;
+  grid-auto-rows: min-content;
+  align-content: start;
+  row-gap: 4px;
+  padding: 4px 0;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
 .pager::-webkit-scrollbar { display: none; }
-.page {
-  flex: 0 0 100%;
-  scroll-snap-align: start;
-  display: grid;
-  grid-auto-rows: min-content;
-  align-content: start;
-  row-gap: 4px;
-  padding: 4px;
-}
 .dots { display: flex; justify-content: center; gap: 7px; padding: 4px 0 4px; }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink); opacity: 0.18; transition: opacity 0.2s, transform 0.2s; }
 .dot.on { opacity: 0.7; transform: scale(1.15); }
@@ -273,7 +268,9 @@ input, textarea { font: inherit; color: inherit; }
   -webkit-touch-callout: none;
   transition: transform 0.28s var(--spring), opacity 0.2s ease, filter 0.2s ease;
 }
-.coin-cell.draggable { touch-action: pan-x; }
+/* pan-x everywhere: rows and pages still swipe, but no browser long-press gesture
+   steals the pointer before our own long press (edit mode) */
+.coin-cell { touch-action: pan-x; }
 .coin-cell:active .orb { transform: scale(0.93); }
 
 .orb {
@@ -649,4 +646,47 @@ button.list-row:active { background: var(--key-press); }
   flex: none; width: 34px; height: 34px; border-radius: 50%;
   display: grid; place-items: center;
   background: var(--field); color: var(--muted);
+}
+
+/* ------------------------------------------------------------ edit mode (home-screen style) */
+
+.row, .pager { position: relative; }
+.coin-slot { position: relative; min-width: 0; height: 100%; }
+.jiggle { position: relative; }
+.jiggle > .coin-cell { width: 100%; }
+.coin-cell.role-placeholder { opacity: 0; }
+
+.editing .coin-cell { touch-action: none; }
+.editing .jiggle { animation: jiggle 0.3s ease-in-out infinite; }
+.editing .coin-slot:nth-child(2n) .jiggle,
+.editing .pager-cell:nth-child(2n) .jiggle { animation-delay: -0.15s; }
+.editing .coin-slot:nth-child(3n) .jiggle,
+.editing .pager-cell:nth-child(3n) .jiggle { animation-duration: 0.27s; }
+@keyframes jiggle {
+  0%, 100% { transform: rotate(-1.4deg); }
+  50% { transform: rotate(1.4deg); }
+}
+
+.remove-badge {
+  position: absolute; z-index: 2;
+  top: 2px; left: calc(50% - var(--orb) / 2 - 8px);
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--glass-solid); color: var(--ink);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25), 0 0 0 0.5px var(--glass-edge);
+  animation: badge-in 0.22s var(--ease-out);
+}
+.remove-badge:active { transform: scale(0.88); }
+@keyframes badge-in { from { transform: scale(0); } }
+
+.done-btn {
+  flex: none; height: 44px; padding: 0 20px; border-radius: 999px;
+  font-size: 17px; font-weight: 650; color: var(--accent);
+  transition: transform 0.15s var(--ease-out);
+}
+.done-btn:active { transform: scale(0.95); }
+
+@media (prefers-reduced-motion: reduce) {
+  .editing .jiggle { animation: none; }
+  .remove-badge { animation: none; }
 }

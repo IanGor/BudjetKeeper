@@ -43,6 +43,8 @@ interface BudgetState {
 
   createEntity(input: EntityInput): Promise<Entity | null>
   updateEntity(id: string, patch: Partial<EntityInput & { archived: boolean }>): Promise<boolean>
+  /** saves a new display order: position = index in `ids` */
+  reorder(ids: string[]): Promise<boolean>
 
   addTransaction(input: TransactionInput): Promise<boolean>
   updateTransaction(old: Transaction, patch: Partial<TransactionInput>): Promise<boolean>
@@ -191,6 +193,20 @@ export const useBudget = create<BudgetState>((set, get) => {
       const { error } = await supabase.from('entities').update(patch).eq('id', id)
       if (error) {
         get().upsertEntityLocal(prev)
+        return fail(error)
+      }
+      return true
+    },
+
+    async reorder(ids) {
+      const before = ids.map((id) => get().entities[id]).filter((e): e is Entity => Boolean(e))
+      if (before.every((e, i) => e.position === i)) return true
+      const withPositions = (list: Entity[], pos: (e: Entity, i: number) => number) =>
+        set({ entities: { ...get().entities, ...Object.fromEntries(list.map((e, i) => [e.id, { ...get().entities[e.id], position: pos(e, i) }])) } })
+      withPositions(before, (_, i) => i)
+      const { error } = await supabase.rpc('reorder_entities', { p_ids: ids })
+      if (error) {
+        withPositions(before, (e) => e.position)
         return fail(error)
       }
       return true

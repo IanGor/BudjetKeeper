@@ -115,6 +115,18 @@ describe.skipIf(!url || !key)('database', () => {
     }
   })
 
+  it('reorders entities in one call, only within the own household', async () => {
+    const names = ['Связь', 'Одежда', 'Продукты']
+    const { error } = await alice.rpc('reorder_entities', { p_ids: names.map((n) => ids[n]) })
+    expect(error).toBeNull()
+    const { data } = await bob.from('entities').select('name, position').in('name', names).eq('household_id', hid)
+    expect(Object.fromEntries(data!.map((e) => [e.name, e.position]))).toEqual({ Связь: 0, Одежда: 1, Продукты: 2 })
+
+    await eve.rpc('reorder_entities', { p_ids: [ids['Продукты'], ids['Связь']] })
+    const { data: after } = await alice.from('entities').select('name, position').in('name', ['Продукты', 'Связь'])
+    expect(Object.fromEntries(after!.map((e) => [e.name, e.position]))).toEqual({ Связь: 0, Продукты: 2 })
+  })
+
   it('does not allow changing an entity kind', async () => {
     const { error } = await alice.from('entities').update({ kind: 'account' }).eq('id', ids['Продукты'])
     expect(error?.message).toMatch(/cannot be changed/)

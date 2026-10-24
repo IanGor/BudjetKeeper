@@ -1,9 +1,11 @@
-import { ChevronDown, Settings2 } from 'lucide-react'
+import { ChevronDown, Settings2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { orderedKind, stopEditing, useArrange } from '../hooks/useArrange'
+import { useFlip } from '../hooks/useFlip'
 import { useRealtime } from '../hooks/useRealtime'
 import { formatRub } from '../lib/money'
 import type { Entity, EntityKind } from '../lib/types'
-import { selectKind, useBudget } from '../store/budget'
+import { useBudget } from '../store/budget'
 import { AmountSheet } from './AmountSheet'
 import { AddTile, Coin, DragGhost } from './Coin'
 import { EntityEditor, EntitySheet } from './EntitySheet'
@@ -34,6 +36,9 @@ export function Board() {
   const totals = useBudget((s) => s.totals)
   const month = useBudget((s) => s.month)
   const householdName = useBudget((s) => s.household?.name)
+  const updateEntity = useBudget((s) => s.updateEntity)
+  const editing = useArrange((s) => s.editing)
+  const draft = useArrange((s) => s.draft)
 
   const [flow, setFlow] = useState<{ from: Entity; to: Entity } | null>(null)
   const [openedId, setOpenedId] = useState<string | null>(null)
@@ -41,9 +46,19 @@ export function Board() {
   const [settings, setSettings] = useState(false)
   const [incomeOpen, setIncomeOpen] = useState(() => readFlag(INCOME_OPEN_KEY))
 
-  const incomes = useMemo(() => selectKind(entities, 'income'), [entities])
-  const accounts = useMemo(() => selectKind(entities, 'account'), [entities])
-  const expenses = useMemo(() => selectKind(entities, 'expense'), [entities])
+  const incomes = useMemo(() => orderedKind(entities, 'income', draft), [entities, draft])
+  const accounts = useMemo(() => orderedKind(entities, 'account', draft), [entities, draft])
+  const expenses = useMemo(() => orderedKind(entities, 'expense', draft), [entities, draft])
+
+  const boardRef = useRef<HTMLDivElement>(null)
+  useFlip(boardRef, [...incomes, ...accounts, ...expenses].map((e) => e.id).join(','))
+
+  useEffect(() => {
+    if (!editing) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && stopEditing()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [editing])
 
   const onDrop = useCallback((from: Entity, to: Entity) => setFlow({ from, to }), [])
   const onTap = useCallback((e: Entity) => setOpenedId(e.id), [])
@@ -54,8 +69,29 @@ export function Board() {
   const balance = sum(accounts)
 
   const coin = (e: Entity) => (
-    <Coin key={e.id} entity={e} total={totals[e.id] ?? 0} entities={entities} onTap={onTap} onDrop={onDrop} />
+    <div key={e.id} className="coin-slot" data-flip-id={e.id}>
+      <div className="jiggle">
+        <Coin entity={e} total={totals[e.id] ?? 0} entities={entities} onTap={onTap} onDrop={onDrop} />
+        {editing && (
+          <button
+            type="button"
+            className="remove-badge"
+            aria-label={`Скрыть «${e.name}»`}
+            onClick={() => void updateEntity(e.id, { archived: true })}
+          >
+            <X size={13} strokeWidth={3} />
+          </button>
+        )}
+      </div>
+    </div>
   )
+
+  const add = (kind: EntityKind, label: string) =>
+    editing ? null : (
+      <div key="add" className="coin-slot">
+        <AddTile label={label} onClick={() => setCreating(kind)} />
+      </div>
+    )
 
   const toggleIncome = () => {
     writeFlag(INCOME_OPEN_KEY, !incomeOpen)
@@ -65,15 +101,26 @@ export function Board() {
   const opened = openedId ? entities[openedId] : undefined
 
   return (
-    <div className="board">
+    <div
+      ref={boardRef}
+      className={`board${editing ? ' editing' : ''}`}
+      // tapping empty space leaves edit mode, as on the home screen
+      onPointerDown={(e) => editing && !(e.target as Element).closest('.coin-slot, button') && stopEditing()}
+    >
       <header className="topbar">
         <div className="titles">
-          <div className="eyebrow">{householdName}</div>
+          <div className="eyebrow">{editing ? 'Изменение порядка' : householdName}</div>
           <h1 className="large-title">{MONTHS[Number(month.slice(5, 7)) - 1]}</h1>
         </div>
-        <button type="button" className="circle-btn glass" onClick={() => setSettings(true)} aria-label="Настройки">
-          <Settings2 size={21} strokeWidth={2} />
-        </button>
+        {editing ? (
+          <button type="button" className="done-btn glass" onClick={stopEditing}>
+            Готово
+          </button>
+        ) : (
+          <button type="button" className="circle-btn glass" onClick={() => setSettings(true)} aria-label="Настройки">
+            <Settings2 size={21} strokeWidth={2} />
+          </button>
+        )}
       </header>
 
       <section className="card glass">
@@ -86,7 +133,7 @@ export function Board() {
           <div>
             <div className="row" data-drag-scroll="income">
               {incomes.map(coin)}
-              <AddTile label="Источник" onClick={() => setCreating('income')} />
+              {add('income', 'Источник')}
             </div>
           </div>
         </div>
@@ -99,7 +146,7 @@ export function Board() {
         </div>
         <div className="row" data-drag-scroll="accounts">
           {accounts.map(coin)}
-          <AddTile label="Счёт" onClick={() => setCreating('account')} />
+          {add('account', 'Счёт')}
         </div>
       </section>
 
@@ -108,10 +155,7 @@ export function Board() {
           <span className="card-title">Расходы</span>
           <span className="card-meta">{formatRub(expenseSum)}</span>
         </div>
-        <CategoryPager
-          items={expenses.map(coin)}
-          add={<AddTile key="add" label="Категория" onClick={() => setCreating('expense')} />}
-        />
+        <CategoryPager items={[...expenses.map(coin), add('expense', 'Категория')].filter(Boolean)} />
       </section>
 
       <DragGhost />
@@ -123,11 +167,16 @@ export function Board() {
   )
 }
 
-const CELL_HEIGHT = 128 // ring + orb + name + amount + plan + row gap
+const CELL_HEIGHT = 128 // ring + orb + name + amount + plan + row gap (4px)
 
-function CategoryPager({ items, add }: { items: ReactNode[]; add: ReactNode }) {
+/**
+ * Categories in pages of cols×rows. All cells share one grid parent and are
+ * placed page by page, so a coin dragged to another page keeps its element
+ * (no remount mid-gesture) and glides there.
+ */
+function CategoryPager({ items }: { items: ReactNode[] }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [layout, setLayout] = useState({ cols: 4, perPage: 16 })
+  const [layout, setLayout] = useState({ cols: 4, rows: 4 })
   const [page, setPage] = useState(0)
 
   useEffect(() => {
@@ -136,7 +185,7 @@ function CategoryPager({ items, add }: { items: ReactNode[]; add: ReactNode }) {
     const measure = () => {
       const cols = el.clientWidth >= 600 ? 6 : 4
       const rows = Math.max(1, Math.floor((el.clientHeight - 8) / CELL_HEIGHT))
-      setLayout((prev) => (prev.cols === cols && prev.perPage === cols * rows ? prev : { cols, perPage: cols * rows }))
+      setLayout((prev) => (prev.cols === cols && prev.rows === rows ? prev : { cols, rows }))
     }
     measure()
     const ro = new ResizeObserver(measure)
@@ -144,9 +193,9 @@ function CategoryPager({ items, add }: { items: ReactNode[]; add: ReactNode }) {
     return () => ro.disconnect()
   }, [])
 
-  const all = [...items, add]
-  const pages: ReactNode[][] = []
-  for (let i = 0; i < all.length; i += layout.perPage) pages.push(all.slice(i, i + layout.perPage))
+  const { cols, rows } = layout
+  const perPage = cols * rows
+  const pages = Math.max(1, Math.ceil(items.length / perPage))
 
   return (
     <>
@@ -154,17 +203,31 @@ function CategoryPager({ items, add }: { items: ReactNode[]; add: ReactNode }) {
         ref={ref}
         className="pager"
         data-drag-scroll="expenses"
+        style={{
+          gridTemplateColumns: `repeat(${pages * cols}, calc(100% / ${cols}))`,
+          // pages share row tracks; fixed rows keep a tall cell on one page from stretching the others
+          gridAutoRows: `${CELL_HEIGHT - 4}px`,
+        }}
         onScroll={(e) => setPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
       >
-        {pages.map((p, i) => (
-          <div key={i} className="page" style={{ gridTemplateColumns: `repeat(${layout.cols}, 1fr)` }}>
-            {p}
-          </div>
-        ))}
+        {items.map((item, i) => {
+          const p = Math.floor(i / perPage)
+          const r = Math.floor((i % perPage) / cols)
+          const c = i % cols
+          return (
+            <div
+              key={(item as { key?: string }).key ?? i}
+              className="pager-cell"
+              style={{ gridColumn: p * cols + c + 1, gridRow: r + 1, scrollSnapAlign: i % perPage === 0 ? 'start' : undefined }}
+            >
+              {item}
+            </div>
+          )
+        })}
       </div>
-      {pages.length > 1 && (
+      {pages > 1 && (
         <div className="dots">
-          {pages.map((_, i) => (
+          {Array.from({ length: pages }, (_, i) => (
             <span key={i} className={`dot${i === page ? ' on' : ''}`} />
           ))}
         </div>

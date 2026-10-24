@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react'
 import type { CSSProperties } from 'react'
+import { useArrange } from '../hooks/useArrange'
 import { useDrag, useCoinDrag, useDropRole } from '../hooks/useCoinDrag'
 import { iconFor } from '../lib/icons'
 import { formatRubShort } from '../lib/money'
@@ -55,7 +56,7 @@ export function Coin({ entity, total, entities, onTap, onDrop }: CoinProps) {
       data-entity-id={entity.id}
       className={`coin-cell${canDragFrom(entity.kind) ? ' draggable' : ''}${role ? ` role-${role}` : ''}`}
       // pointer taps are handled by the drag hook; this keeps keyboard access
-      onClick={(e) => e.detail === 0 && onTap(entity)}
+      onClick={(e) => e.detail === 0 && !useArrange.getState().editing && onTap(entity)}
     >
       <Orb entity={entity} progress={hasPlan ? total / plan : undefined} over={over} />
       <span className="coin-name">{entity.name}</span>
