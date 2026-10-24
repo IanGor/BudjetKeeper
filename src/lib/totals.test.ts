@@ -1,0 +1,48 @@
+import { describe, expect, it } from 'vitest'
+import { applyTransaction, inMonth, monthStart, todayISO } from './totals'
+import type { Entity, EntityKind } from './types'
+
+const ent = (id: string, kind: EntityKind) => ({ id, kind }) as Entity
+const entities = {
+  salary: ent('salary', 'income'),
+  card: ent('card', 'account'),
+  cash: ent('cash', 'account'),
+  food: ent('food', 'expense'),
+}
+const month = '2026-10-01'
+
+describe('date helpers', () => {
+  it('formats month start and today', () => {
+    const d = new Date(2026, 0, 7)
+    expect(monthStart(d)).toBe('2026-01-01')
+    expect(todayISO(d)).toBe('2026-01-07')
+  })
+  it('checks month membership', () => {
+    expect(inMonth('2026-10-31', month)).toBe(true)
+    expect(inMonth('2026-09-30', month)).toBe(false)
+  })
+})
+
+describe('applyTransaction', () => {
+  it('income adds to source and account', () => {
+    const t = applyTransaction({}, entities, { from_id: 'salary', to_id: 'card', amount_kopecks: 5000, occurred_at: '2026-10-05' }, month)
+    expect(t).toEqual({ salary: 5000, card: 5000 })
+  })
+  it('expense moves money from account to category', () => {
+    const t = applyTransaction({ card: 5000 }, entities, { from_id: 'card', to_id: 'food', amount_kopecks: 1200, occurred_at: '2026-10-05' }, month)
+    expect(t).toEqual({ card: 3800, food: 1200 })
+  })
+  it('transfer moves between accounts', () => {
+    const t = applyTransaction({ card: 5000 }, entities, { from_id: 'card', to_id: 'cash', amount_kopecks: 1000, occurred_at: '2026-10-05' }, month)
+    expect(t).toEqual({ card: 4000, cash: 1000 })
+  })
+  it('other months change only account balances', () => {
+    const t = applyTransaction({}, entities, { from_id: 'card', to_id: 'food', amount_kopecks: 700, occurred_at: '2026-09-30' }, month)
+    expect(t).toEqual({ card: -700 })
+  })
+  it('sign -1 reverts', () => {
+    const tx = { from_id: 'card', to_id: 'food', amount_kopecks: 700, occurred_at: '2026-10-01' }
+    const t = applyTransaction(applyTransaction({ card: 1000 }, entities, tx, month), entities, tx, month, -1)
+    expect(t).toEqual({ card: 1000, food: 0 })
+  })
+})
