@@ -26,15 +26,17 @@ npm run build
 
 ## Деплой
 
-1. **Supabase**: создать проект на supabase.com, затем
-   `npx supabase link --project-ref <ref>` и `npx supabase db push`.
-   - Authentication → URL Configuration: Site URL = адрес фронтенда.
-   - Authentication → Providers → Email: «Confirm email» можно выключить —
-     пользователей всего двое. Если оставить включённым, приложение попросит подтвердить почту.
-2. **Фронтенд** (Cloudflare Pages / Vercel / Netlify): команда сборки `npm run build`,
-   каталог `dist`, переменные `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY`
-   (Project Settings → API). HTTPS обязателен для PWA.
-3. На телефоне открыть сайт → «На экран Домой» (iOS Safari) / «Установить приложение» (Android).
+Сайт: https://iangor.github.io/BudjetKeeper/ · Supabase-проект `rqtehljigsoupuobunub`.
+
+1. **Фронтенд** — GitHub Pages, workflow `.github/workflows/pages.yml` на каждый push в `master`
+   (typecheck, тесты, сборка с `BASE=/BudjetKeeper/`). URL и publishable-ключ Supabase —
+   в переменных репозитория `SUPABASE_URL` и `SUPABASE_PUBLISHABLE_KEY`.
+2. **База** — новые миграции из `supabase/migrations`:
+   `npx supabase login` (в обычном терминале), `npx supabase link --project-ref rqtehljigsoupuobunub`,
+   `npx supabase db push`.
+3. **Авторизация** — секция `[auth]` в `supabase/config.toml` (Site URL, подтверждение email выключено)
+   совпадает с облаком; после правок — `npx supabase config push`, проверив показанный diff.
+4. На телефоне открыть сайт → «На экран Домой» (iOS Safari) / «Установить приложение» (Android).
    Первый регистрируется и создаёт бюджет, второй регистрируется и вводит код из «Настроек».
 
 ## Как пользоваться
