@@ -458,6 +458,10 @@ input, textarea { font: inherit; color: inherit; }
   transition: transform 0.12s var(--ease-out), background-color 0.12s;
 }
 .key:active { transform: scale(0.95); background: var(--surface-press); }
+/* Safari with its bars: room for the round-up line without pushing «Готово» off screen */
+@media (max-height: 700px) {
+  .key { height: 46px; }
+}
 .key.op { color: var(--accent); font-weight: 500; }
 .key.done {
   grid-column: span 4;
