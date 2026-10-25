@@ -199,16 +199,26 @@ input, textarea { font: inherit; color: inherit; }
 .plan-bar-text strong { font-size: var(--t0); font-weight: 650; color: var(--ink); }
 .plan-bar-text .over strong, .plan-bar-text .short strong { color: var(--over); }
 .plan-bar-track {
-  position: relative; height: 8px; margin-top: 4px;
-  border-radius: 4px; background: var(--surface-2); overflow: hidden;
+  position: relative; height: 16px; margin-top: 4px;
+  border-radius: 8px; overflow: hidden;
+  background: var(--surface);
+  /* an outline, so the empty part of the plan reads as part of the bar */
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, var(--hairline));
 }
 .plan-bar-fill {
-  position: absolute; inset: 0 auto 0 0;
-  width: calc(var(--fill, 0) * 100%);
-  border-radius: inherit; background: var(--accent);
-  transition: width 0.5s var(--ease-out);
+  position: absolute; inset: 0;
+  color: #fff; background: var(--accent);
+  clip-path: inset(0 calc((1 - var(--fill, 0)) * 100%) 0 0);
+  transition: clip-path 0.5s var(--ease-out);
 }
+.plan-bar-track.over { box-shadow: inset 0 0 0 1.5px var(--over); }
 .plan-bar-track.over .plan-bar-fill { background: var(--over); }
+.plan-bar-label {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-size: 11px; line-height: 1; font-weight: 700; color: var(--text-2);
+}
+.plan-bar-fill .plan-bar-label { color: #fff; }
 /* today: spending to the right of it runs ahead of the month */
 .plan-bar-today {
   position: absolute; top: 0; bottom: 0; width: 2px;
@@ -437,6 +447,7 @@ input, textarea { font: inherit; color: inherit; }
   white-space: normal;
 }
 .display .delta.neg { color: var(--error); }
+.display .delta.roundup { color: var(--muted); }
 
 .keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
 .key {

@@ -181,6 +181,21 @@ describe.skipIf(!url || !key || !serviceKey)('database', () => {
     expect(members).toHaveLength(2)
   })
 
+  it('round-ups go to an account of the same budget; members cannot raise the member cap', async () => {
+    const set = (c: SupabaseClient, id: string | null) =>
+      c.from('households').update({ roundup_account_id: id }).eq('id', hid).select('roundup_account_id')
+    const ok = await set(bob, ids['Карта'])
+    expect(ok.error).toBeNull()
+    expect(ok.data).toEqual([{ roundup_account_id: ids['Карта'] }])
+    expect((await set(alice, ids['Кафе'])).error?.message).toMatch(/account of this household/)
+    const foreign = Object.values(await entityIds(eve))[0]
+    expect((await set(alice, foreign)).error).not.toBeNull()
+    expect((await set(alice, null)).error).toBeNull()
+    // only the name and the round-up account are the members' to change
+    expect((await alice.from('households').update({ max_members: 5 }).eq('id', hid)).error?.message).toMatch(/permission denied/)
+    expect((await alice.from('households').update({ name: 'Семья' }).eq('id', hid)).error).toBeNull()
+  })
+
   it('does not let anyone sign up', async () => {
     const { error } = await client().auth.signUp({ email: `new-${crypto.randomUUID().slice(0, 8)}@test.local`, password: 'password123' })
     expect(error?.message).toMatch(/signups not allowed|disabled/i)

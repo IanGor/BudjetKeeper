@@ -127,12 +127,15 @@ export function EntityEditor({ kind, onClose }: { kind: EntityKind; onClose(): v
 function EntityForm({ kind, entity, onDone }: { kind: EntityKind; entity?: Entity; onDone(): void }) {
   const createEntity = useBudget((s) => s.createEntity)
   const updateEntity = useBudget((s) => s.updateEntity)
+  const roundupId = useBudget((s) => s.household?.roundup_account_id ?? null)
+  const setRoundupAccount = useBudget((s) => s.setRoundupAccount)
   const online = useOnline()
   const [name, setName] = useState(entity?.name ?? '')
   const [icon, setIcon] = useState(entity?.icon ?? ICON_CHOICES[kind][0])
   const [color, setColor] = useState(entity?.color ?? DEFAULT_COLOR[kind])
   const [plan, setPlan] = useState(entity?.plan_kopecks != null ? String(entity.plan_kopecks / 100).replace('.', ',') : '')
   const [inBalance, setInBalance] = useState(entity?.in_balance ?? true)
+  const [roundup, setRoundup] = useState(entity !== undefined && entity.id === roundupId)
   const [confirmArchive, setConfirmArchive] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -152,7 +155,11 @@ function EntityForm({ kind, entity, onDone }: { kind: EntityKind; entity?: Entit
       plan_kopecks: hasPlan ? planKopecks : null,
       ...(kind === 'account' && { in_balance: inBalance }),
     }
-    const ok = entity ? await updateEntity(entity.id, fields) : (await createEntity({ kind, ...fields })) !== null
+    const saved = entity ? ((await updateEntity(entity.id, fields)) ? entity : null) : await createEntity({ kind, ...fields })
+    let ok = saved !== null
+    // round-ups go to one account: switching it on here moves them from the other one
+    const wasRoundup = saved !== null && saved.id === roundupId
+    if (saved && kind === 'account' && roundup !== wasRoundup) ok = await setRoundupAccount(roundup ? saved.id : null)
     setBusy(false)
     if (ok) onDone()
   }
@@ -204,6 +211,22 @@ function EntityForm({ kind, entity, onDone }: { kind: EntityKind; entity?: Entit
             className="switch"
             checked={inBalance}
             onChange={(e) => setInBalance(e.target.checked)}
+          />
+        </label>
+      )}
+
+      {kind === 'account' && (
+        <label className="switch-row">
+          <span className="main">
+            <span>Копилка округлений</span>
+            <span className="sub">Траты со счетов округляются вверх до 10 ₽, разница приходит сюда</span>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            className="switch"
+            checked={roundup}
+            onChange={(e) => setRoundup(e.target.checked)}
           />
         </label>
       )}

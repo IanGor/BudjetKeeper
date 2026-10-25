@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canDragFrom, canFlow, flowLabel, planFill } from './rules'
+import { canDragFrom, canFlow, flowLabel, planFill, roundUpExtra } from './rules'
 import type { EntityKind } from './types'
 
 const kinds: EntityKind[] = ['income', 'account', 'expense']
@@ -46,5 +46,20 @@ describe('planFill', () => {
   it('without a plan any spending fills it, nothing is "over"', () => {
     expect(planFill(1, null)).toEqual({ fill: 1, over: false })
     expect(planFill(1, 0)).toEqual({ fill: 1, over: false })
+  })
+})
+
+describe('roundUpExtra', () => {
+  it('rounds a spending up to 10 ₽, as the bank does', () => {
+    expect(roundUpExtra(35_00)).toBe(5_00)
+    expect(roundUpExtra(1_433_00)).toBe(7_00)
+    expect(roundUpExtra(12_320_00)).toBe(0)
+  })
+  it('counts kopecks too', () => {
+    expect(roundUpExtra(35_50)).toBe(4_50)
+    expect(roundUpExtra(10_01)).toBe(9_99)
+  })
+  it('adds nothing to nothing', () => {
+    expect(roundUpExtra(0)).toBe(0)
   })
 })

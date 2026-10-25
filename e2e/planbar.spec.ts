@@ -22,8 +22,14 @@ test('the bottom bar shows spent of the plan and the money on the accounts', asy
   // the seeded budget is overspent: a full red bar
   expect(spent).toBeGreaterThan(planned)
   await expect(track).toHaveClass(/over/)
-  const fill = await track.evaluate((t) => t.querySelector('.plan-bar-fill')!.getBoundingClientRect().width / t.clientWidth)
-  expect(fill).toBeCloseTo(1, 2)
+  expect(Number(await track.evaluate((t) => getComputedStyle(t).getPropertyValue('--fill')))).toBe(1)
+  // the share of the plan is written on the bar, readable over the fill too
+  const percent = `${String(Math.round((spent / planned) * 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f')}\u00a0%`
+  await expect(track.locator('.plan-bar-label').first()).toHaveText(percent)
+  await expect(track.locator('.plan-bar-fill .plan-bar-label')).toHaveCSS('color', 'rgb(255, 255, 255)')
+  // tall enough to read, with an outline
+  expect((await track.boundingBox())!.height).toBeGreaterThanOrEqual(16)
+  expect(await track.evaluate((t) => getComputedStyle(t).boxShadow)).not.toBe('none')
 
   // pinned to the bottom of the board, above the home indicator
   const board = (await page.locator('.board').boundingBox())!

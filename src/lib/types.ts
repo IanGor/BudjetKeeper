@@ -32,6 +32,8 @@ export interface Household {
   name: string
   invite_code: string
   max_members: number
+  /** account that collects round-ups of spending; null = no round-ups */
+  roundup_account_id: string | null
 }
 
 export interface Member {

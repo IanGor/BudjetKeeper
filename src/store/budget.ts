@@ -48,6 +48,10 @@ interface BudgetState {
   reorder(ids: string[]): Promise<boolean>
 
   addTransaction(input: TransactionInput): Promise<boolean>
+  /** several operations in one request: all are saved or none */
+  addTransactions(inputs: TransactionInput[]): Promise<boolean>
+  /** the account that collects round-ups, or null to stop them */
+  setRoundupAccount(id: string | null): Promise<boolean>
   updateTransaction(old: Transaction, patch: Partial<TransactionInput>): Promise<boolean>
   deleteTransaction(tx: Transaction): Promise<boolean>
   fetchTransactions(entityId: string): Promise<Transaction[]>
@@ -111,7 +115,7 @@ export const useBudget = create<BudgetState>((set, get) => {
 
       const hid = me.household_id as string
       const [h, members, entities, totals] = await Promise.all([
-        supabase.from('households').select('id, name, invite_code, max_members').eq('id', hid).single(),
+        supabase.from('households').select('id, name, invite_code, max_members, roundup_account_id').eq('id', hid).single(),
         supabase.from('household_members').select('household_id, user_id, display_name').eq('household_id', hid),
         supabase.from('entities').select('*').eq('household_id', hid).order('position'),
         supabase.rpc('entity_totals', { p_month: month }),
@@ -215,17 +219,35 @@ export const useBudget = create<BudgetState>((set, get) => {
       return true
     },
 
-    async addTransaction(input) {
-      const { household, entities, month } = get()
-      if (!household) return false
-      set({ totals: applyTransaction(get().totals, entities, input, month) })
-      const { error } = await supabase.from('transactions').insert({ ...input, household_id: household.id })
+    addTransaction(input) {
+      return get().addTransactions([input])
+    },
+
+    async addTransactions(inputs) {
+      const { household, month } = get()
+      if (!household || inputs.length === 0) return false
+      const apply = (sign: 1 | -1) =>
+        set({ totals: inputs.reduce((t, input) => applyTransaction(t, get().entities, input, month, sign), get().totals) })
+      apply(1)
+      const { error } = await supabase.from('transactions').insert(inputs.map((input) => ({ ...input, household_id: household.id })))
       if (error) {
-        set({ totals: applyTransaction(get().totals, get().entities, input, month, -1) })
+        apply(-1)
         return fail(error)
       }
       get().bumpTx()
       void get().refreshTotals()
+      return true
+    },
+
+    async setRoundupAccount(id) {
+      const household = get().household
+      if (!household) return false
+      set({ household: { ...household, roundup_account_id: id } })
+      const { error } = await supabase.from('households').update({ roundup_account_id: id }).eq('id', household.id)
+      if (error) {
+        set({ household })
+        return fail(error)
+      }
       return true
     },
 

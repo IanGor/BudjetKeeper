@@ -24,9 +24,13 @@ const NNBSP = '\u202f'
  * "тыс"/"млн", so amounts compare at a glance. "−99 999 999" fits a coin column.
  */
 export function formatRubWhole(kopecks: number): string {
-  const rub = Math.round(kopecks / 100)
-  const sign = rub < 0 ? '−' : ''
-  return sign + String(Math.abs(rub)).replace(/\B(?=(\d{3})+(?!\d))/g, NNBSP)
+  return formatInt(Math.round(kopecks / 100))
+}
+
+/** 27889 -> "27 889", digit groups by narrow no-break spaces. */
+export function formatInt(n: number): string {
+  const sign = n < 0 ? '−' : ''
+  return sign + String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, NNBSP)
 }
 
 /** "1 234,5" -> 123450; null when not a valid non-negative amount up to MAX_KOPECKS. */

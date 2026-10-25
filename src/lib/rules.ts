@@ -27,3 +27,12 @@ export function planFill(spent: number, plan: number | null): { fill: number; ov
   if (plan == null || plan <= 0) return { fill: 1, over: false }
   return { fill: Math.min(spent / plan, 1), over: spent > plan }
 }
+
+/** Round-ups go in steps of 10 ₽, as the bank does. */
+export const ROUNDUP_STEP = 10_00
+
+/** What a spending of `amount` kopecks adds when rounded up to the step: 35 ₽ → 5 ₽, 12 320 ₽ → 0. */
+export function roundUpExtra(amount: number, step = ROUNDUP_STEP): number {
+  if (amount <= 0) return 0
+  return Math.ceil(amount / step) * step - amount
+}

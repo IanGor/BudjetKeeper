@@ -98,3 +98,59 @@ test('edit mode: long press, then Done', async ({ board: page }) => {
   await page.getByRole('button', { name: 'Готово' }).click()
   await expect(page.locator('.board.editing')).toHaveCount(0)
 })
+
+test('a spending is rounded up to 10 ₽, the difference goes to the round-up account', async ({ board: page }) => {
+  // the seeded budget is shared by all device projects, so compare with what was there;
+  // «Еда в городе» is over its plan already and no other test counts its operations
+  const amount = (name: string) => page.locator('[data-entity-id]', { hasText: name }).first().locator('.coin-amount')
+  const read = async (name: string) => Number((await amount(name).textContent())!.replace(/[^\d−]/g, '').replace('−', '-'))
+  const before = { from: await read('Этот месяц'), category: await read('Еда в городе'), roundup: await read('Подушка') }
+
+  await dragCoin(page, 'Этот месяц', 'Еда в городе')
+  const sheet = page.getByRole('dialog')
+  for (const k of ['1', '4', '3', '3']) await sheet.getByRole('button', { name: k, exact: true }).click()
+  // before saving, the sheet tells where the round-up goes
+  await expect(sheet.locator('.delta.roundup')).toHaveText(/С «Этот месяц» спишется 1\s440\s₽ · 7\s₽ → «Подушка»/)
+  await sheetIsClean(page)
+  const done = sheet.getByRole('button', { name: 'Готово' })
+  await expect(done).toBeInViewport({ ratio: 1 })
+  await done.click()
+  await expect(sheet).toBeHidden()
+
+  // the category gets the real price, the account pays the rounded sum
+  await expect.poll(() => read('Еда в городе')).toBe(before.category + 1433)
+  await expect.poll(() => read('Этот месяц')).toBe(before.from - 1440)
+  await expect.poll(() => read('Подушка')).toBe(before.roundup + 7)
+
+  // a round sum adds nothing
+  await dragCoin(page, 'Этот месяц', 'Еда в городе')
+  for (const k of ['5', '0']) await sheet.getByRole('button', { name: k, exact: true }).click()
+  await expect(sheet.locator('.delta.roundup')).toHaveCount(0)
+  await sheet.getByRole('button', { name: 'Готово' }).click()
+  await expect.poll(() => read('Подушка')).toBe(before.roundup + 7)
+  await expect.poll(() => read('Этот месяц')).toBe(before.from - 1490)
+})
+
+test('round-ups can be moved to another account in its settings', async ({ board: page }) => {
+  const open = async (name: string) => {
+    await page.locator('[data-entity-id]', { hasText: name }).first().click()
+    const sheet = page.getByRole('dialog')
+    await sheet.getByRole('button', { name: 'Настройки' }).click()
+    return sheet
+  }
+  let sheet = await open('Бэйбик')
+  const sw = sheet.getByRole('switch', { name: /Копилка округлений/ })
+  await expect(sw).not.toBeChecked()
+  await sw.check()
+  await sheet.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(sheet).toBeHidden()
+
+  // only one account collects them: «Подушка» lost it; give it back for the other devices
+  sheet = await open('Подушка')
+  await expect(sheet.getByRole('switch', { name: /Копилка округлений/ })).not.toBeChecked()
+  await sheet.getByRole('switch', { name: /Копилка округлений/ }).check()
+  await sheet.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(sheet).toBeHidden()
+  sheet = await open('Бэйбик')
+  await expect(sheet.getByRole('switch', { name: /Копилка округлений/ })).not.toBeChecked()
+})

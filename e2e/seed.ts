@@ -95,6 +95,10 @@ export async function seed() {
   if (ins.error) throw ins.error
   const id = Object.fromEntries(ins.data.map((e) => [`${e.kind}:${e.name}`, e.id as string]))
 
+  // round-ups of spending go to a savings account («Вклад» holds the largest amount, untouched)
+  const ru = await admin.from('households').update({ roundup_account_id: id['account:Подушка'] }).eq('id', hid)
+  if (ru.error) throw ru.error
+
   const tx = FLOWS.map(([f, t, k]) => ({ household_id: hid, from_id: id[f], to_id: id[t], amount_kopecks: k }))
   // a negative balance: money leaves an account that never received any
   tx.push({ household_id: hid, from_id: id['account:Стоматолог'], to_id: id['expense:Маме'], amount_kopecks: 1250000 })

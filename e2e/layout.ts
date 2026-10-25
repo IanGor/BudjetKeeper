@@ -25,6 +25,8 @@ export function textBoxes(root: Locator): Promise<Box[]> {
       if (!text) continue
       const style = getComputedStyle(el)
       if (style.visibility === 'hidden' || Number(style.opacity) === 0) continue
+      // decorative copies (e.g. the percentage drawn again over the bar's fill)
+      if (el.closest('[aria-hidden="true"]')) continue
       let r = el.getBoundingClientRect()
       let left = r.left
       let top = r.top

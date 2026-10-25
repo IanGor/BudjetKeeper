@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useOnline } from '../hooks/useOnline'
 import { hasOperator, kopecksToInput, pressKey, type Key } from '../lib/keypad'
 import { evalExpression, formatRub, MAX_KOPECKS } from '../lib/money'
-import { flowLabel } from '../lib/rules'
+import { flowLabel, roundUpExtra } from '../lib/rules'
 import { adjustmentFor, todayISO } from '../lib/totals'
 import type { Entity, Transaction } from '../lib/types'
 import { useBudget } from '../store/budget'
@@ -24,6 +24,7 @@ interface Props {
 const KEYS: Key[] = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', ',', '0', 'back', '+']
 const KEYBOARD: Record<string, Key> = { '.': ',', ',': ',', '+': '+', '-': '−', '*': '×', '/': '÷', Backspace: 'back' }
 const ADJUSTMENT = 'Корректировка'
+const ROUNDUP = 'Округление'
 
 export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
   const [expr, setExpr] = useState(tx ? kopecksToInput(tx.amount_kopecks) : '')
@@ -32,6 +33,9 @@ export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const online = useOnline()
   const addTransaction = useBudget((s) => s.addTransaction)
+  const addTransactions = useBudget((s) => s.addTransactions)
+  const roundupId = useBudget((s) => s.household?.roundup_account_id)
+  const roundupAccount = useBudget((s) => (roundupId ? s.entities[roundupId] : undefined))
   const updateTransaction = useBudget((s) => s.updateTransaction)
   const deleteTransaction = useBudget((s) => s.deleteTransaction)
 
@@ -39,6 +43,14 @@ export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date)
   const delta = balance && amount !== null ? amount - balance.current : 0
   const valid = dateOk && amount !== null && amount <= MAX_KOPECKS && (balance ? delta !== 0 : amount > 0)
+
+  // a new spending from an account is rounded up to 10 ₽: the category gets the
+  // real price, the difference goes to the round-up account (not from itself)
+  const roundup =
+    !tx && !balance && from?.kind === 'account' && to?.kind === 'expense' && roundupAccount && !roundupAccount.archived && roundupAccount.id !== from.id
+      ? roundupAccount
+      : null
+  const extra = roundup && amount !== null ? roundUpExtra(amount) : 0
 
   const isAdjustment = !balance && (from === null || to === null)
   const account = balance?.account ?? (isAdjustment ? (from ?? to) : null)
@@ -55,7 +67,12 @@ export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
     } else if (tx) {
       void updateTransaction(tx, { amount_kopecks: amount, occurred_at: date, comment: note })
     } else {
-      void addTransaction({ from_id: from!.id, to_id: to!.id, amount_kopecks: amount, occurred_at: date, comment: note })
+      const spending = { from_id: from!.id, to_id: to!.id, amount_kopecks: amount, occurred_at: date, comment: note }
+      void addTransactions(
+        roundup && extra > 0
+          ? [spending, { from_id: from!.id, to_id: roundup.id, amount_kopecks: extra, occurred_at: date, comment: ROUNDUP }]
+          : [spending],
+      )
     }
     onClose()
   }
@@ -130,9 +147,14 @@ export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
       <div className="display num" aria-live="polite">
         <span className="expr">{hasOperator(expr) ? expr : balance ? 'Новый баланс' : ''}</span>
         {amount !== null ? (
-          formatRub(amount)
+          <span className="value">{formatRub(amount)}</span>
         ) : (
           <span className="placeholder">{formatRub(balance ? balance.current : 0)}</span>
+        )}
+        {roundup && extra > 0 && amount !== null && (
+          <span className="delta roundup">
+            С «{from!.name}» спишется {formatRub(amount + extra)} · {formatRub(extra)} → «{roundup.name}»
+          </span>
         )}
         {balance && amount !== null && (
           <span className={`delta${delta < 0 ? ' neg' : ''}`}>
