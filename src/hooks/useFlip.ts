@@ -19,8 +19,12 @@ export function useFlip(ref: RefObject<HTMLElement | null>, key: string) {
       next.set(id, now)
       const was = prev.current.get(id)
       if (!was || reduce || was.parent !== now.parent) return
-      const dx = was.x - now.x
-      const dy = was.y - now.y
+      // a coin still gliding from the last change starts from where it is seen, not from
+      // where it was headed (that jumped it back a slot when the order changed again)
+      const { m41, m42 } = new DOMMatrixReadOnly(getComputedStyle(el).transform)
+      const dx = was.x + m41 - now.x
+      const dy = was.y + m42 - now.y
+      el.getAnimations().forEach((a) => a.cancel())
       if (Math.abs(dx) + Math.abs(dy) < 1) return
       el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], {
         duration: 320,

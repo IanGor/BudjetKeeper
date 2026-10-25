@@ -51,6 +51,7 @@ const EDGE_DWELL_MS = 700
 const EDGE_REPEAT_MS = 900
 const FLIP_MS = 450 // a smooth page flip takes about this long
 const SLOT_INSET = 0.15 // of a slot's width on each side: no target there while rearranging
+const SLOT_DWELL_MS = 280 // the coin rests over a slot this long before the others make room
 
 interface Options {
   entity: Entity
@@ -95,11 +96,16 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
     let edgeKey = ''
     let flippingUntil = 0
     let lastOver: string | null = null
+    let pending: Entity | null = null // the slot the coin rests over, until the dwell is up
+    let dwellTimer = 0
+    let lastX = 0
+    let lastY = 0
 
     const activate = (x: number, y: number) => {
       if (active) return
       active = true
       lastOver = null
+      pending = null
       window.clearTimeout(pressTimer)
       window.clearTimeout(returnTimer)
       navigator.vibrate?.(12)
@@ -126,8 +132,9 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
     // Rearranging hit-tests the grid slots, not the coins: coins glide to their new
     // slots after every move, and one sliding under the finger was taken for a target,
     // moved the dragged coin again, and so on (everything jumped while the finger wandered).
-    // A slot counts only away from its sides, so a finger on a border does not flap.
-    const slotAt = (x: number, y: number): Entity | null => {
+    // A slot counts only away from its sides, so a finger on a border does not flap; on
+    // the sides of the slot being aimed at, `undefined` is returned: the aim is kept.
+    const slotAt = (x: number, y: number): Entity | null | undefined => {
       const area = el.closest<HTMLElement>('[data-drag-scroll]')
       if (!area) return null
       const a = area.getBoundingClientRect()
@@ -138,7 +145,10 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
         if (!id) continue
         const r = cell.getBoundingClientRect()
         const inset = r.width * SLOT_INSET
-        if (x > r.left + inset && x < r.right - inset && y > r.top && y < r.bottom) return pick(id)
+        if (x >= r.left && x <= r.right && y > r.top && y < r.bottom) {
+          if (x > r.left + inset && x < r.right - inset) return pick(id)
+          return id === pending?.id ? undefined : null
+        }
         last = { id, r }
       }
       // the empty cells after the last coin of a section: dropping there moves the coin to the end
@@ -187,6 +197,7 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
       window.clearTimeout(pressTimer)
       window.clearTimeout(editTimer)
       window.clearTimeout(edgeTimer)
+      window.clearTimeout(dwellTimer)
       edgeKey = ''
       pointerId = null
       holding = false
@@ -194,14 +205,23 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
       active = false
     }
 
-    const returnGhost = () => {
-      const orb = el.querySelector('.orb')?.getBoundingClientRect()
-      if (!orb || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // `moved`: the coin was just given a new slot; it renders there a frame later and
+    // glides in (FLIP), so the ghost heads for where the coin will rest, not where it is seen
+    const returnGhost = (moved = false) => {
+      if (!el.querySelector('.orb') || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         reset()
         return
       }
       reset(false)
-      useDrag.setState({ x: orb.left + orb.width / 2, y: orb.top + orb.height / 2, overId: null, returning: true })
+      const land = () => {
+        const orb = el.querySelector('.orb')?.getBoundingClientRect()
+        if (!orb) return
+        const slot = el.closest<HTMLElement>('[data-flip-id]')
+        const { m41, m42 } = new DOMMatrixReadOnly(slot ? getComputedStyle(slot).transform : 'none')
+        useDrag.setState({ x: orb.left + orb.width / 2 - m41, y: orb.top + orb.height / 2 - m42, overId: null, returning: true })
+      }
+      if (moved) requestAnimationFrame(land)
+      else land()
       returnTimer = window.setTimeout(
         () => useDrag.setState({ source: null, returning: false, reorder: false }),
         RETURN_MS,
@@ -247,11 +267,24 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
       // coins sliding under a still finger during a page flip are no targets
       const flipping = performance.now() < flippingUntil
       if (mode === 'reorder') {
-        const target = flipping ? null : slotAt(e.clientX, e.clientY)
-        // the dragged coin takes the slot, and the finger is then over its own slot; until
-        // that renders, the same slot is not taken again (that would move the coin back)
-        if (target && target.id !== lastOver) moveOver(opts.current.entity, target)
-        lastOver = target?.id ?? null
+        const hit = flipping ? null : slotAt(e.clientX, e.clientY)
+        lastX = e.clientX
+        lastY = e.clientY
+        // The others stay put while the finger passes over them: only a coin resting over
+        // a slot takes it (the coins there make room), or one released there. After the
+        // move the finger is over the coin's own slot, which is no target.
+        if (hit !== undefined && hit?.id !== pending?.id) {
+          window.clearTimeout(dwellTimer)
+          pending = hit
+          if (hit) {
+            dwellTimer = window.setTimeout(() => {
+              // a move read off the slots before the last one rendered would aim at a stale slot
+              const still = slotAt(lastX, lastY)
+              pending = null
+              if (still === undefined || still?.id === hit.id) moveOver(opts.current.entity, hit)
+            }, SLOT_DWELL_MS)
+          }
+        }
         useDrag.setState({ x: e.clientX, y: e.clientY })
         edgeScroll(e.clientX, e.clientY)
         return
@@ -271,8 +304,12 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
       if (mode === 'reorder') {
         // taps do nothing while editing, as on the home screen
         if (active) {
+          // released over a slot: the coin takes it at once, without the dwell
+          const hit = slotAt(e.clientX, e.clientY)
+          const target = hit === undefined ? pending : hit
+          if (target) moveOver(opts.current.entity, target)
           commitOrder()
-          returnGhost()
+          returnGhost(Boolean(target))
         } else reset()
         return
       }

@@ -65,6 +65,38 @@ test('a coin held over the corner coin of a row stays put and lands there', asyn
   await expect.poll(() => names(accounts)).toEqual(before)
 })
 
+// The bug: the coins made room the moment the finger touched a slot, so a coin carried
+// across the grid set every coin it passed over moving.
+test('coins stay put while a held coin passes over them', async ({ board: page }) => {
+  const accounts = page.locator('.section').nth(1)
+  const coins = accounts.locator('[data-entity-id]')
+  const before = await names(accounts)
+  const target = await center(coins.nth(2).locator('.orb'))
+  const from = await pickUp(page, coins.first())
+  // count every change of order while the coin is carried across
+  await accounts.locator('.pager').evaluate((el) => {
+    const w = window as unknown as { reorders: number }
+    w.reorders = 0
+    new MutationObserver(() => w.reorders++).observe(el, { childList: true })
+  })
+  await page.mouse.move(target.x, target.y, { steps: 6 })
+  expect(await page.evaluate(() => (window as unknown as { reorders: number }).reorders), 'moved on the way').toBe(0)
+  await hold(page, target, 600)
+  // the coin took the slot it rests over, in one move
+  expect(await names(accounts)).toEqual([before[1], before[2], before[0], ...before.slice(3)])
+  expect(await page.evaluate(() => (window as unknown as { reorders: number }).reorders)).toBe(1)
+  await page.mouse.up()
+
+  // put it back: a release over a slot takes it at once
+  await page.waitForTimeout(400)
+  const back = await center(coins.nth(2).locator('.orb'))
+  await page.mouse.move(back.x, back.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x, from.y, { steps: 4 })
+  await page.mouse.up()
+  await expect.poll(() => names(accounts)).toEqual(before)
+})
+
 test('the very screen edge still flips to the next page, after a moment', async ({ board: page }) => {
   const accounts = page.locator('.section').nth(1)
   const pager = accounts.locator('.pager')
