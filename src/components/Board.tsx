@@ -1,4 +1,4 @@
-import { ChevronDown, Settings2, Star, X } from 'lucide-react'
+import { ChevronDown, Settings2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { orderedKind, stopEditing, useArrange } from '../hooks/useArrange'
 import { useDrag } from '../hooks/useCoinDrag'
@@ -11,6 +11,7 @@ import { useBudget } from '../store/budget'
 import { AmountSheet } from './AmountSheet'
 import { AddTile, Coin, DragGhost } from './Coin'
 import { EntityEditor, EntitySheet } from './EntitySheet'
+import { MonthIcon } from './MonthIcon'
 import { PlanBar } from './PlanBar'
 import { Settings } from './Settings'
 
@@ -47,7 +48,6 @@ export function Board() {
   const entities = useBudget((s) => s.entities)
   const totals = useBudget((s) => s.totals)
   const month = useBudget((s) => s.month)
-  const householdName = useBudget((s) => s.household?.name)
   const updateEntity = useBudget((s) => s.updateEntity)
   const editing = useArrange((s) => s.editing)
   const dragging = useDrag((s) => s.source !== null)
@@ -124,9 +124,8 @@ export function Board() {
     >
       <header className="topbar">
         <div className="titles">
-          <div className="eyebrow">{editing ? 'Изменение порядка' : householdName}</div>
           <h1 className="large-title">
-            <Star aria-hidden="true" />
+            <MonthIcon month={Number(month.slice(5, 7)) - 1} />
             {MONTHS[Number(month.slice(5, 7)) - 1]}
           </h1>
         </div>
