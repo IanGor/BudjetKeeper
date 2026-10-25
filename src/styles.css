@@ -23,6 +23,8 @@
   --scrim: rgba(17, 18, 20, 0.28);
   --sheet-shadow: 0 -10px 40px -12px rgba(17, 18, 20, 0.22);
   --tint: 13%;
+  --orb-empty: #eef0f3; /* a category with nothing spent yet */
+  --over: #ff3b47; /* spending beyond the plan: bright, not the ink of other amounts */
 
   --orb: 52px;
   --gutter: 16px;
@@ -55,6 +57,8 @@
     --scrim: rgba(0, 0, 0, 0.5);
     --sheet-shadow: 0 -10px 40px -12px rgba(0, 0, 0, 0.6);
     --tint: 22%;
+    --orb-empty: #313338;
+    --over: #ff5c66;
   }
 }
 
@@ -78,6 +82,8 @@
   --scrim: rgba(0, 0, 0, 0.5);
   --sheet-shadow: 0 -10px 40px -12px rgba(0, 0, 0, 0.6);
   --tint: 22%;
+  --orb-empty: #313338;
+  --over: #ff5c66;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -232,12 +238,21 @@ input, textarea { font: inherit; color: inherit; }
 .orb.tinted { color: var(--c); background: color-mix(in srgb, var(--c) var(--tint), var(--surface)); }
 .orb.add { color: var(--accent); border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); }
 
-/* plan progress: a thin ring, like the progress pie of a Things project */
-.ring { position: absolute; inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px); transform: rotate(-90deg); }
-.ring circle { fill: none; stroke-width: 2.5; }
-.ring .track { stroke: var(--hairline); }
-.ring .value { stroke: var(--c); stroke-linecap: round; transition: stroke-dasharray 0.5s var(--ease-out); }
-.ring.over .value { stroke: var(--error); }
+/* categories with a plan: a neutral disc that fills from the bottom with the
+   category color as money is spent, full when the plan is reached */
+.orb.gauge { color: var(--c); background: var(--orb-empty); overflow: hidden; }
+.orb-fill {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
+  height: calc(var(--fill, 0) * 100%);
+  overflow: hidden;
+  color: #fff; background: var(--c);
+  transition: height 0.5s var(--ease-out);
+}
+/* the white glyph sits exactly over the colored one, whatever the level */
+.orb-fill > .lucide {
+  position: absolute; left: 28%; bottom: calc(var(--orb) * 0.28);
+  width: calc(var(--orb) * 0.44); height: calc(var(--orb) * 0.44);
+}
 
 /* up to two lines for long names ("На следующий месяц") */
 .coin-name {
@@ -252,6 +267,8 @@ input, textarea { font: inherit; color: inherit; }
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .coin-amount.neg { color: var(--error); }
+/* spent beyond the plan */
+.coin-amount.over { color: var(--over); }
 .coin-plan { font-size: 11px; line-height: 14px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .add-tile .coin-name { color: var(--accent); }
 
@@ -528,7 +545,7 @@ button.list-row:active { background: var(--surface-2); }
   .sheet, .closing .sheet { animation-name: fade-in; }
   .closing .sheet { animation-name: fade-out; }
   .toast { animation: fade-in 0.2s ease; }
-  .collapse, .chevron, .ring .value { transition: none; }
+  .collapse, .chevron, .orb-fill { transition: none; }
   .coin-cell, .orb, .ghost, .ghost .orb { transition: opacity 0.15s ease; animation: none; }
   .coin-cell.role-over { transform: none; }
 }

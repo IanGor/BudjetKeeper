@@ -4,32 +4,31 @@ import { useArrange } from '../hooks/useArrange'
 import { useDrag, useCoinDrag, useDropRole } from '../hooks/useCoinDrag'
 import { iconFor } from '../lib/icons'
 import { formatRubShort } from '../lib/money'
-import { canDragFrom } from '../lib/rules'
+import { canDragFrom, planFill } from '../lib/rules'
 import type { Entity } from '../lib/types'
 
 interface OrbProps {
   entity: Entity
-  /** plan fulfilment 0..n; draws a ring when set */
-  progress?: number
-  over?: boolean
+  /** spending against the plan 0..1: a neutral disc fills up with the category color */
+  fill?: number
 }
 
-/** Income sources and accounts are flat discs of their color; categories are a light tint with a colored glyph. */
-export function Orb({ entity, progress, over = false }: OrbProps) {
+/**
+ * Income sources and accounts are flat discs of their color; categories are a light tint with a colored glyph.
+ * With `fill` a category is a neutral disc that fills from the bottom like a glass: the filled part is
+ * a solid disc of its color with a white glyph, clipped to the level.
+ */
+export function Orb({ entity, fill }: OrbProps) {
   const Icon = iconFor(entity.icon)
-  const value = progress === undefined ? 0 : Math.min(Math.max(progress, 0), 1) * 100
+  const kind = fill !== undefined ? 'gauge' : entity.kind === 'expense' ? 'tinted' : 'solid'
   return (
-    <span
-      className={`orb ${entity.kind === 'expense' ? 'tinted' : 'solid'}`}
-      style={{ '--c': entity.color } as CSSProperties}
-    >
-      {progress !== undefined && (
-        <svg className={`ring${over ? ' over' : ''}`} viewBox="0 0 68 68" aria-hidden="true">
-          <circle className="track" cx="34" cy="34" r="32" />
-          {value > 0 && <circle className="value" cx="34" cy="34" r="32" pathLength={100} strokeDasharray={`${value} 100`} />}
-        </svg>
-      )}
+    <span className={`orb ${kind}`} style={{ '--c': entity.color, '--fill': fill } as CSSProperties}>
       <Icon strokeWidth={2} />
+      {fill !== undefined && (
+        <span className="orb-fill" aria-hidden="true">
+          <Icon strokeWidth={2} />
+        </span>
+      )}
     </span>
   )
 }
@@ -47,7 +46,7 @@ export function Coin({ entity, total, entities, onTap, onDrop }: CoinProps) {
   const role = useDropRole(entity)
   const plan = entity.plan_kopecks
   const hasPlan = plan != null && plan > 0
-  const over = entity.kind === 'expense' && hasPlan && total > plan
+  const gauge = entity.kind === 'expense' ? planFill(total, plan) : undefined
 
   return (
     <button
@@ -58,9 +57,9 @@ export function Coin({ entity, total, entities, onTap, onDrop }: CoinProps) {
       // pointer taps are handled by the drag hook; this keeps keyboard access
       onClick={(e) => e.detail === 0 && !useArrange.getState().editing && onTap(entity)}
     >
-      <Orb entity={entity} progress={hasPlan ? total / plan : undefined} over={over} />
+      <Orb entity={entity} fill={gauge?.fill} />
       <span className="coin-name">{entity.name}</span>
-      <span className={`coin-amount${total < 0 ? ' neg' : ''}`}>{formatRubShort(total)}</span>
+      <span className={`coin-amount${total < 0 ? ' neg' : ''}${gauge?.over ? ' over' : ''}`}>{formatRubShort(total)}</span>
       {hasPlan && <span className="coin-plan">из {formatRubShort(plan)}</span>}
     </button>
   )

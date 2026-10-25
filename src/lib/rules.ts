@@ -16,3 +16,14 @@ export function flowLabel(from: EntityKind, to: EntityKind): string {
   if (to === 'account') return 'Перевод'
   return 'Расход'
 }
+
+/**
+ * How full a category's icon is drawn: 0 with nothing spent, 1 when the
+ * spending reaches the plan. Without a plan any spending fills it.
+ * `over` marks spending beyond the plan.
+ */
+export function planFill(spent: number, plan: number | null): { fill: number; over: boolean } {
+  if (spent <= 0) return { fill: 0, over: false }
+  if (plan == null || plan <= 0) return { fill: 1, over: false }
+  return { fill: Math.min(spent / plan, 1), over: spent > plan }
+}
