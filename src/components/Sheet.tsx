@@ -21,6 +21,7 @@ const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)'
 
 export function Sheet({ title, subtitle, leading, onClose, children }: SheetProps) {
   const [closing, setClosing] = useState(false)
+  const backdropRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
   const drag = useRef<{ id: number; startY: number; samples: { y: number; t: number }[] } | null>(null)
 
@@ -30,6 +31,29 @@ export function Sheet({ title, subtitle, leading, onClose, children }: SheetProp
     setClosing(true)
     window.setTimeout(onClose, reducedMotion() ? 0 : CLOSE_MS)
   }, [closing, onClose])
+
+  // On-screen keyboards cover the page instead of resizing it (Chrome on Android,
+  // Safari): the browser then pans the whole page to the focused field and the sheet's
+  // top goes off screen. The backdrop follows the visible part of the page, so the
+  // sheet shrinks above the keyboard and scrolls inside, header kept.
+  useEffect(() => {
+    const vv = window.visualViewport
+    const backdrop = backdropRef.current
+    if (!vv || !backdrop) return
+    const fit = () => {
+      backdrop.style.top = `${vv.offsetTop}px`
+      backdrop.style.height = `${vv.height}px`
+      const field = document.activeElement
+      if (field instanceof HTMLInputElement && backdrop.contains(field)) field.scrollIntoView({ block: 'nearest' })
+    }
+    fit()
+    vv.addEventListener('resize', fit)
+    vv.addEventListener('scroll', fit)
+    return () => {
+      vv.removeEventListener('resize', fit)
+      vv.removeEventListener('scroll', fit)
+    }
+  }, [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && dismiss()
@@ -81,7 +105,11 @@ export function Sheet({ title, subtitle, leading, onClose, children }: SheetProp
   }
 
   return (
-    <div className={`backdrop${closing ? ' closing' : ''}`} onPointerDown={(e) => e.target === e.currentTarget && dismiss()}>
+    <div
+      ref={backdropRef}
+      className={`backdrop${closing ? ' closing' : ''}`}
+      onPointerDown={(e) => e.target === e.currentTarget && dismiss()}
+    >
       <div
         ref={sheetRef}
         className="sheet"

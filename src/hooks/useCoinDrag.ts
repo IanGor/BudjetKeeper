@@ -50,6 +50,7 @@ const EDGE = 20
 const EDGE_DWELL_MS = 700
 const EDGE_REPEAT_MS = 900
 const FLIP_MS = 450 // a smooth page flip takes about this long
+const SLOT_INSET = 0.15 // of a slot's width on each side: no target there while rearranging
 
 interface Options {
   entity: Entity
@@ -122,15 +123,30 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
       return target && target.id !== opts.current.entity.id ? target : null
     }
 
-    // the empty cells after the last coin of a section: dropping there moves the coin to the end
-    const endOfSection = (x: number, y: number): Entity | null => {
-      const area = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-drag-scroll]')
-      const coins = area?.querySelectorAll<HTMLElement>('[data-entity-id]')
-      const last = coins?.[coins.length - 1]
-      if (!last) return null
-      const r = last.getBoundingClientRect()
-      if (!(y > r.bottom || (y >= r.top && x > r.right))) return null
-      const target = opts.current.entities[last.dataset.entityId!]
+    // Rearranging hit-tests the grid slots, not the coins: coins glide to their new
+    // slots after every move, and one sliding under the finger was taken for a target,
+    // moved the dragged coin again, and so on (everything jumped while the finger wandered).
+    // A slot counts only away from its sides, so a finger on a border does not flap.
+    const slotAt = (x: number, y: number): Entity | null => {
+      const area = el.closest<HTMLElement>('[data-drag-scroll]')
+      if (!area) return null
+      const a = area.getBoundingClientRect()
+      if (x < a.left || x > a.right || y < a.top || y > a.bottom) return null
+      let last: { id: string; r: DOMRect } | null = null
+      for (const cell of area.querySelectorAll<HTMLElement>('.pager-cell')) {
+        const id = cell.querySelector<HTMLElement>('[data-entity-id]')?.dataset.entityId
+        if (!id) continue
+        const r = cell.getBoundingClientRect()
+        const inset = r.width * SLOT_INSET
+        if (x > r.left + inset && x < r.right - inset && y > r.top && y < r.bottom) return pick(id)
+        last = { id, r }
+      }
+      // the empty cells after the last coin of a section: dropping there moves the coin to the end
+      if (last && (y > last.r.bottom || (y >= last.r.top && x > last.r.right))) return pick(last.id)
+      return null
+    }
+    const pick = (id: string): Entity | null => {
+      const target = opts.current.entities[id]
       return target && target.id !== opts.current.entity.id ? target : null
     }
 
@@ -231,10 +247,11 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
       // coins sliding under a still finger during a page flip are no targets
       const flipping = performance.now() < flippingUntil
       if (mode === 'reorder') {
-        const target = flipping ? null : (entityAt(e.clientX, e.clientY) ?? endOfSection(e.clientX, e.clientY))
-        // react once per target: the slots shift under the finger after a move
+        const target = flipping ? null : slotAt(e.clientX, e.clientY)
+        // the dragged coin takes the slot, and the finger is then over its own slot; until
+        // that renders, the same slot is not taken again (that would move the coin back)
         if (target && target.id !== lastOver) moveOver(opts.current.entity, target)
-        lastOver = target?.id ?? lastOver
+        lastOver = target?.id ?? null
         useDrag.setState({ x: e.clientX, y: e.clientY })
         edgeScroll(e.clientX, e.clientY)
         return

@@ -129,6 +129,16 @@ test('a spending is rounded up to 10 ₽, the difference goes to the round-up ac
   await sheet.getByRole('button', { name: 'Готово' }).click()
   await expect.poll(() => read('Подушка')).toBe(before.roundup + 7)
   await expect.poll(() => read('Этот месяц')).toBe(before.from - 1490)
+
+  // rounding can be switched off for one operation
+  await dragCoin(page, 'Этот месяц', 'Еда в городе')
+  for (const k of ['1', '5']) await sheet.getByRole('button', { name: k, exact: true }).click()
+  await sheet.getByRole('button', { name: 'Не округлять' }).click()
+  await expect(sheet.locator('.delta.roundup > span')).toHaveText('Без округления')
+  await sheetIsClean(page)
+  await sheet.getByRole('button', { name: 'Готово' }).click()
+  await expect.poll(() => read('Этот месяц')).toBe(before.from - 1505)
+  await expect.poll(() => read('Подушка')).toBe(before.roundup + 7)
 })
 
 test('round-ups can be moved to another account in its settings', async ({ board: page }) => {

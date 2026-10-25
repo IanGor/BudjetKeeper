@@ -12,23 +12,23 @@ describe('pressKey', () => {
     expect(type(['1', '+', '0', '7'])).toBe('1+7')
   })
   it('adds a zero before a leading comma and allows one comma per number', () => {
-    expect(type([',', '5'])).toBe('0,5')
-    expect(type(['1', ',', ',', '2'])).toBe('1,2')
-    expect(type(['1', ',', '2', '+', ',', '3'])).toBe('1,2+0,3')
+    expect(type(['.', '5'])).toBe('0.5')
+    expect(type(['1', '.', '.', '2'])).toBe('1.2')
+    expect(type(['1', '.', '2', '+', '.', '3'])).toBe('1.2+0.3')
   })
   it('takes at most 8 digits of rubles per number: 99 999 999 ₽', () => {
     const nines = Array<Key>(9).fill('9')
     expect(type(nines)).toBe('99999999')
-    expect(type([...nines, ',', '5'])).toBe('99999999,5')
+    expect(type([...nines, '.', '5'])).toBe('99999999.5')
     expect(type(['1', '+', ...nines])).toBe('1+99999999')
   })
   it('limits kopecks to two digits', () => {
-    expect(type(['1', ',', '2', '3', '4'])).toBe('1,23')
+    expect(type(['1', '.', '2', '3', '4'])).toBe('1.23')
   })
   it('handles operators', () => {
     expect(type(['+'])).toBe('')
     expect(type(['5', '+', '×'])).toBe('5×')
-    expect(type(['5', ',', '−'])).toBe('5−')
+    expect(type(['5', '.', '−'])).toBe('5−')
   })
   it('backspace removes the last char', () => {
     expect(type(['1', '2', 'back'])).toBe('1')
@@ -39,8 +39,8 @@ describe('pressKey', () => {
 describe('kopecksToInput', () => {
   it('formats for editing', () => {
     expect(kopecksToInput(12000)).toBe('120')
-    expect(kopecksToInput(123450)).toBe('1234,5')
-    expect(kopecksToInput(1205)).toBe('12,05')
+    expect(kopecksToInput(123450)).toBe('1234.5')
+    expect(kopecksToInput(1205)).toBe('12.05')
   })
 })
 

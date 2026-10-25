@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { formatInt, formatRubWhole } from '../lib/money'
+import { formatInt, formatAmount } from '../lib/money'
 import { planFill } from '../lib/rules'
 
 interface Props {
@@ -28,10 +28,10 @@ export function PlanBar({ spent, planned, available, elapsed }: Props) {
     <footer className="plan-bar">
       <div className="plan-bar-text">
         <span className={over ? 'over' : undefined}>
-          <strong className="num">{formatRubWhole(spent)}</strong> <span>из</span> <span className="num">{formatRubWhole(planned)}</span>
+          <strong className="num">{formatAmount(spent)}</strong> <span>из</span> <span className="num">{formatAmount(planned)}</span>
         </span>
         <span className={short ? 'short' : undefined} title={short ? 'Меньше, чем осталось по плану' : undefined}>
-          <strong className="num">{formatRubWhole(available)}</strong> <span>на счетах</span>
+          <strong className="num">{formatAmount(available)}</strong> <span>на счетах</span>
         </span>
       </div>
       <div

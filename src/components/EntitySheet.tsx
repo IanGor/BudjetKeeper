@@ -133,7 +133,7 @@ function EntityForm({ kind, entity, onDone }: { kind: EntityKind; entity?: Entit
   const [name, setName] = useState(entity?.name ?? '')
   const [icon, setIcon] = useState(entity?.icon ?? ICON_CHOICES[kind][0])
   const [color, setColor] = useState(entity?.color ?? DEFAULT_COLOR[kind])
-  const [plan, setPlan] = useState(entity?.plan_kopecks != null ? String(entity.plan_kopecks / 100).replace('.', ',') : '')
+  const [plan, setPlan] = useState(entity?.plan_kopecks != null ? String(entity.plan_kopecks / 100) : '')
   const [inBalance, setInBalance] = useState(entity?.in_balance ?? true)
   const [roundup, setRoundup] = useState(entity !== undefined && entity.id === roundupId)
   const [confirmArchive, setConfirmArchive] = useState(false)
@@ -195,7 +195,7 @@ function EntityForm({ kind, entity, onDone }: { kind: EntityKind; entity?: Entit
             placeholder="без плана"
             onChange={(e) => setPlan(e.target.value)}
           />
-          {planInvalid && <span className="error">Введите сумму, например 15000 или 999,90</span>}
+          {planInvalid && <span className="error">Введите сумму, например 15000 или 999.90</span>}
         </label>
       )}
 

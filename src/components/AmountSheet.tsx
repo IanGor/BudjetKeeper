@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useOnline } from '../hooks/useOnline'
 import { hasOperator, kopecksToInput, pressKey, type Key } from '../lib/keypad'
 import { evalExpression, formatRub, MAX_KOPECKS } from '../lib/money'
+import { celebrateDrop } from '../lib/celebrate'
 import { flowLabel, roundUpExtra } from '../lib/rules'
 import { adjustmentFor, todayISO } from '../lib/totals'
 import type { Entity, Transaction } from '../lib/types'
@@ -21,8 +22,8 @@ interface Props {
   onClose(): void
 }
 
-const KEYS: Key[] = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', ',', '0', 'back', '+']
-const KEYBOARD: Record<string, Key> = { '.': ',', ',': ',', '+': '+', '-': '−', '*': '×', '/': '÷', Backspace: 'back' }
+const KEYS: Key[] = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', '.', '0', 'back', '+']
+const KEYBOARD: Record<string, Key> = { '.': '.', ',': '.', '+': '+', '-': '−', '*': '×', '/': '÷', Backspace: 'back' }
 const ADJUSTMENT = 'Корректировка'
 const ROUNDUP = 'Округление'
 
@@ -31,6 +32,8 @@ export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
   const [date, setDate] = useState(tx?.occurred_at ?? todayISO())
   const [comment, setComment] = useState(tx?.comment ?? '')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // rounding up is on whenever the round-up account allows it; this switches it off once
+  const [noRoundup, setNoRoundup] = useState(false)
   const online = useOnline()
   const addTransaction = useBudget((s) => s.addTransaction)
   const addTransactions = useBudget((s) => s.addTransactions)
@@ -50,7 +53,8 @@ export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
     !tx && !balance && from?.kind === 'account' && to?.kind === 'expense' && roundupAccount && !roundupAccount.archived && roundupAccount.id !== from.id
       ? roundupAccount
       : null
-  const extra = roundup && amount !== null ? roundUpExtra(amount) : 0
+  const roundable = roundup && amount !== null ? roundUpExtra(amount) : 0
+  const extra = noRoundup ? 0 : roundable
 
   const isAdjustment = !balance && (from === null || to === null)
   const account = balance?.account ?? (isAdjustment ? (from ?? to) : null)
@@ -68,6 +72,7 @@ export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
       void updateTransaction(tx, { amount_kopecks: amount, occurred_at: date, comment: note })
     } else {
       const spending = { from_id: from!.id, to_id: to!.id, amount_kopecks: amount, occurred_at: date, comment: note }
+      if (to!.kind === 'expense') celebrateDrop(to!.id)
       void addTransactions(
         roundup && extra > 0
           ? [spending, { from_id: from!.id, to_id: roundup.id, amount_kopecks: extra, occurred_at: date, comment: ROUNDUP }]
@@ -151,9 +156,16 @@ export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
         ) : (
           <span className="placeholder">{formatRub(balance ? balance.current : 0)}</span>
         )}
-        {roundup && extra > 0 && amount !== null && (
+        {roundup && roundable > 0 && amount !== null && (
           <span className="delta roundup">
-            С «{from!.name}» спишется {formatRub(amount + extra)} · {formatRub(extra)} → «{roundup.name}»
+            <span>
+              {noRoundup
+                ? 'Без округления'
+                : `С «${from!.name}» спишется ${formatRub(amount + extra)} · ${formatRub(extra)} → «${roundup.name}»`}
+            </span>
+            <button type="button" className="roundup-toggle" aria-pressed={noRoundup} onClick={() => setNoRoundup((t) => !t)}>
+              Не округлять
+            </button>
           </span>
         )}
         {balance && amount !== null && (

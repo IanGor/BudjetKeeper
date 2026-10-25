@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { evalExpression, formatRub, formatRubWhole, MAX_KOPECKS, parseRub } from './money'
+import { evalExpression, formatAmount, formatRub, MAX_KOPECKS, parseRub } from './money'
 
 const n = (s: string) => s.replace(/[\u00a0\u202f]/g, ' ')
 
@@ -8,9 +8,9 @@ describe('formatRub', () => {
     expect(n(formatRub(123456700))).toBe('1 234 567 ₽')
     expect(n(formatRub(0))).toBe('0 ₽')
   })
-  it('shows kopecks when present', () => {
-    expect(n(formatRub(1234550))).toBe('12 345,50 ₽')
-    expect(n(formatRub(5))).toBe('0,05 ₽')
+  it('shows kopecks after a point', () => {
+    expect(n(formatRub(1234550))).toBe('12 345.50 ₽')
+    expect(n(formatRub(5))).toBe('0.05 ₽')
   })
   it('prints sign', () => {
     expect(n(formatRub(-15000))).toBe('−150 ₽')
@@ -18,20 +18,20 @@ describe('formatRub', () => {
   })
 })
 
-describe('formatRubWhole', () => {
-  it('prints every digit of whole rubles, without units', () => {
-    expect(n(formatRubWhole(0))).toBe('0')
-    expect(n(formatRubWhole(2_222_100))).toBe('22 221')
-    expect(n(formatRubWhole(14_000_000))).toBe('140 000')
-    expect(n(formatRubWhole(MAX_KOPECKS))).toBe('99 999 999')
-    expect(n(formatRubWhole(-MAX_KOPECKS))).toBe('−99 999 999')
+describe('formatAmount', () => {
+  it('prints every digit, without units', () => {
+    expect(n(formatAmount(0))).toBe('0')
+    expect(n(formatAmount(2_222_100))).toBe('22 221')
+    expect(n(formatAmount(MAX_KOPECKS))).toBe('99 999 999')
+    expect(n(formatAmount(-MAX_KOPECKS))).toBe('−99 999 999')
   })
-  it('rounds kopecks to rubles', () => {
-    expect(formatRubWhole(12_345_650)).toBe(formatRubWhole(12_345_700))
-    expect(n(formatRubWhole(-50_000))).toBe('−500')
+  it('keeps kopecks instead of rounding to rubles', () => {
+    expect(n(formatAmount(12_345_650))).toBe('123 456.50')
+    expect(n(formatAmount(-50_001))).toBe('−500.01')
+    expect(n(formatAmount(35_955_768))).toBe('359 557.68')
   })
   it('groups with narrow no-break spaces so the number never wraps', () => {
-    expect(formatRubWhole(123_456_700)).toBe('1\u202f234\u202f567')
+    expect(formatAmount(123_456_700)).toBe('1\u202f234\u202f567')
   })
 })
 

@@ -106,3 +106,36 @@ test('the empty cells after the last coin take a coin to the end', async ({ boar
   await page.mouse.up()
   await expect.poll(() => names(expenses)).toEqual([...before.slice(0, -2), before.at(-1)!, before.at(-2)!])
 })
+
+// The bug: a finger wandering over the coins in edit mode set them all jumping. Coins
+// gliding to their new places were taken for targets as they slid under the finger.
+test('a finger wandering in edit mode moves only the held coin, to the slot under it', async ({ board: page }) => {
+  const expenses = page.locator('.expenses')
+  const coins = expenses.locator('[data-entity-id]')
+  const before = await names(expenses)
+  test.skip(before.length < 8, 'needs two rows of coins')
+  const slots = await Promise.all([1, 6, 2, 5, 7, 3].map((i) => center(coins.nth(i).locator('.orb'))))
+  const from = await pickUp(page, coins.first())
+  let at = from
+  for (const p of slots) {
+    await glide(page, at, p)
+    at = p
+  }
+  // held still over one slot: the order settles with the coin there and stays
+  await hold(page, at, 900)
+  const settled = await names(expenses)
+  await hold(page, at, 600)
+  expect(await names(expenses)).toEqual(settled)
+  await page.mouse.up()
+  const moved = [...before.slice(1, 4), before[0], ...before.slice(4)]
+  await expect.poll(() => names(expenses)).toEqual(moved)
+
+  // put it back for the other tests
+  await page.waitForTimeout(400)
+  const back = await center(coins.nth(3).locator('.orb'))
+  await page.mouse.move(back.x, back.y)
+  await page.mouse.down()
+  await glide(page, back, await center(coins.first().locator('.orb')))
+  await page.mouse.up()
+  await expect.poll(() => names(expenses)).toEqual(before)
+})
