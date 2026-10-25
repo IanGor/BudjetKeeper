@@ -59,10 +59,24 @@ export function Coin({ entity, total, entities, onTap, onDrop }: CoinProps) {
     >
       <Orb entity={entity} fill={gauge?.fill} />
       <CoinName>{entity.name}</CoinName>
-      <span className={`coin-amount${total < 0 ? ' neg' : ''}${gauge?.over ? ' over' : ''}`}>{formatRubWhole(total)}</span>
+      <Fit className={`coin-amount${total < 0 ? ' neg' : ''}${gauge?.over ? ' over' : ''}`} text={formatRubWhole(total)} />
       {/* the plan line is kept even when empty, so all categories line up */}
-      {entity.kind === 'expense' && <span className="coin-plan">{hasPlan ? `из ${formatRubWhole(plan)}` : ''}</span>}
+      {entity.kind === 'expense' && <Fit className="coin-plan" text={hasPlan ? `из ${formatRubWhole(plan)}` : ''} />}
     </button>
+  )
+}
+
+/**
+ * A one-line caption that shrinks to the width of its coin when it is long
+ * ("−99 999 999"): its width in em is estimated generously (bold digits of the
+ * widest fallback fonts), and CSS takes min(its size, coin width / that).
+ */
+function Fit({ className, text }: { className: string; text: string }) {
+  const ems = [...text].reduce((w, ch) => w + (/\d/.test(ch) ? 0.7 : ch === '−' ? 0.84 : ch === '\u202f' ? 0.33 : 0.62), 0)
+  return (
+    <span className={className} style={{ '--ems': Math.max(ems, 1) } as CSSProperties}>
+      {text}
+    </span>
   )
 }
 

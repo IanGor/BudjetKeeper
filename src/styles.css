@@ -275,14 +275,16 @@ input, textarea { font: inherit; color: inherit; }
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
   overflow: hidden; overflow-wrap: anywhere;
 }
+/* long amounts shrink to the coin: see Fit in Coin.tsx; cqi is the coin's width */
+.coin-cell { container-type: inline-size; }
 .coin-amount {
-  font-size: var(--t0); line-height: 20px; font-weight: 650;
+  font-size: min(var(--t0), 100cqi / var(--ems, 1)); line-height: 20px; font-weight: 650;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .coin-amount.neg { color: var(--error); }
 /* spent beyond the plan */
 .coin-amount.over { color: var(--over); }
-.coin-plan { height: 16px; font-size: var(--t-1); line-height: 16px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.coin-plan { height: 16px; font-size: min(var(--t-1), 100cqi / var(--ems, 1)); line-height: 16px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .add-tile .coin-name { color: var(--accent); }
 
 /* drag feedback */
