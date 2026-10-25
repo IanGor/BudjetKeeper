@@ -288,11 +288,12 @@ input, textarea { font: inherit; color: inherit; }
   width: calc(var(--orb) * 0.44); height: calc(var(--orb) * 0.44);
 }
 
-/* the name has a fixed slot of two lines, centered in it: a long name never
-   moves the amount down, every coin of a row keeps the same grid */
+/* the name has a fixed slot of two lines and hangs from the top of it: every
+   name starts at the same distance under its orb, a long name never moves the
+   amount down, and a row reads as lines of orbs, names, amounts and plans */
 .coin-name {
   --lh: 16px;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: flex-start; justify-content: center;
   height: calc(2 * var(--lh)); max-width: 100%;
   margin-top: 4px; padding: 0 2px;
   font-size: var(--t-1); line-height: var(--lh); font-weight: 500; color: var(--text-2);

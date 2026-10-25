@@ -83,7 +83,7 @@ function Fit({ className, text }: { className: string; text: string }) {
   )
 }
 
-/** A fixed two-line slot: short and long names alike leave the amount below at the same height. */
+/** A fixed two-line slot, text at its top: short and long names alike leave the amount below at the same height. */
 function CoinName({ children }: { children: string }) {
   return (
     <span className="coin-name">

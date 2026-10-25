@@ -145,7 +145,8 @@ test('a long name does not shift the amount: every row keeps one grid', async ({
         rows.set(top, [...(rows.get(top) ?? []), c])
       }
       return [...rows.values()].flatMap((row) =>
-        ['.orb', '.coin-name', '.coin-amount', '.coin-plan']
+        // .coin-name > span: the text itself, so the first lines of all names line up too
+        ['.orb', '.coin-name', '.coin-name > span', '.coin-amount', '.coin-plan']
           .map((part) => ({
             part,
             tops: [...new Set(row.map((c) => c.querySelector(part)?.getBoundingClientRect().top).filter((t) => t !== undefined).map(Math.round))],
