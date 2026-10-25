@@ -1,6 +1,14 @@
 /* BudjetKeeper — in the style of Things 3: white canvas, opaque surfaces,
    Things blue for actions and section headers, flat colored glyphs,
-   hairline separators instead of cards and shadows. */
+   hairline separators instead of cards and shadows.
+
+   Proportions of the board follow the golden ratio φ ≈ 1.618:
+   - orb diameter = column width / φ, so the space between two orbs is orb / φ
+     (gap : orb = 1 : φ) on any phone width;
+   - a coin cell is at most a golden rectangle: row height ≤ column width × φ;
+   - type sizes are a modular scale with step √φ (two steps = φ):
+     12 → 15 → 19 → 25 → 31 px;
+   - vertical metrics are multiples of a 4 px unit, so text sits on a rhythm. */
 
 :root {
   color-scheme: light;
@@ -26,9 +34,17 @@
   --orb-empty: #eef0f3; /* a category with nothing spent yet */
   --over: #ff3b47; /* spending beyond the plan: bright, not the ink of other amounts */
 
-  --orb: 52px;
+  --phi: 1.618;
   --gutter: 16px;
   --cols: 4; /* coin columns, the same in every section */
+  --col: calc((min(100vw, 1000px) - 2 * var(--gutter)) / var(--cols));
+  --orb: clamp(44px, var(--col) / var(--phi), 72px);
+  /* type scale, step √φ ≈ 1.272 */
+  --t-1: 12px;
+  --t0: 15px;
+  --t1: 19px;
+  --t2: 25px;
+  --t3: 31px;
   --ease-out: cubic-bezier(0.32, 0.72, 0, 1); /* iOS sheet curve */
   --spring: cubic-bezier(0.34, 1.36, 0.64, 1); /* slight overshoot, for momentum only */
   --safe-top: env(safe-area-inset-top, 0px);
@@ -117,22 +133,22 @@ input, textarea { font: inherit; color: inherit; }
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  padding: calc(var(--safe-top) + 8px) var(--gutter) calc(var(--safe-bottom) + 8px);
+  padding: calc(var(--safe-top) + 8px) var(--gutter) calc(var(--safe-bottom) + 8px); /* 2 units */
 }
 
 /* "⭐ Today" header */
-.topbar { display: flex; align-items: center; gap: 12px; padding: 4px 0 6px; }
+.topbar { display: flex; align-items: center; gap: 12px; padding: 4px 0; }
 .topbar .titles { flex: 1; min-width: 0; }
 .eyebrow {
-  font-size: 13px; font-weight: 500; color: var(--muted);
+  font-size: var(--t-1); line-height: 16px; font-weight: 500; color: var(--muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .large-title {
   display: flex; align-items: center; gap: 8px;
   margin: 0;
-  font-size: 28px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em;
+  font-size: var(--t3); font-weight: 700; line-height: 40px; letter-spacing: -0.01em;
 }
-.large-title .lucide { flex: none; width: 24px; height: 24px; color: #f5b82e; fill: #f5b82e; }
+.large-title .lucide { flex: none; width: 26px; height: 26px; color: #f5b82e; fill: #f5b82e; }
 
 .circle-btn {
   flex: none;
@@ -145,17 +161,17 @@ input, textarea { font: inherit; color: inherit; }
 .circle-btn:active { transform: scale(0.92); background: var(--surface-2); }
 
 /* sections: a blue header over a hairline, no card around */
-.section { min-width: 0; margin-top: 10px; }
+.section { min-width: 0; }
 .section-head {
   display: flex; align-items: center; gap: 6px;
-  width: 100%; min-height: 34px;
-  padding: 2px 0 4px;
+  width: 100%; height: 36px;
+  padding: 8px 0 4px;
   border-bottom: 1px solid var(--hairline);
   text-align: left;
 }
-.section-title { font-size: 16px; font-weight: 650; color: var(--section); }
+.section-title { font-size: var(--t1); line-height: 24px; font-weight: 650; color: var(--section); }
 .section-meta {
-  margin-left: auto; font-size: 14px; font-weight: 500; color: var(--muted);
+  margin-left: auto; font-size: var(--t0); line-height: 20px; font-weight: 500; color: var(--muted);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .section-meta.neg { color: var(--error); }
@@ -200,7 +216,7 @@ input, textarea { font: inherit; color: inherit; }
   display: flex; flex-direction: column; align-items: center;
   width: 100%;
   min-width: 0;
-  padding: 10px 2px 6px;
+  padding: 4px 2px 0; /* rows get their air from the pager: more than inside a coin */
   text-align: center;
   user-select: none;
   -webkit-user-select: none;
@@ -247,25 +263,24 @@ input, textarea { font: inherit; color: inherit; }
 /* the name has a fixed slot of two lines, centered in it: a long name never
    moves the amount down, every coin of a row keeps the same grid */
 .coin-name {
-  --lh: 15px;
+  --lh: 16px;
   display: flex; align-items: center; justify-content: center;
   height: calc(2 * var(--lh)); max-width: 100%;
-  margin-top: 7px; padding: 0 2px;
-  font-size: 12px; line-height: var(--lh); font-weight: 500; color: var(--text-2);
+  margin-top: 4px; padding: 0 2px;
+  font-size: var(--t-1); line-height: var(--lh); font-weight: 500; color: var(--text-2);
 }
 .coin-name > span {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
   overflow: hidden; overflow-wrap: anywhere;
 }
 .coin-amount {
-  margin-top: 2px;
-  font-size: 14px; line-height: 18px; font-weight: 650;
+  font-size: var(--t0); line-height: 20px; font-weight: 650;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .coin-amount.neg { color: var(--error); }
 /* spent beyond the plan */
 .coin-amount.over { color: var(--over); }
-.coin-plan { min-height: 14px; font-size: 11px; line-height: 14px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.coin-plan { height: 16px; font-size: var(--t-1); line-height: 16px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .add-tile .coin-name { color: var(--accent); }
 
 /* drag feedback */
@@ -335,7 +350,7 @@ input, textarea { font: inherit; color: inherit; }
 .sheet-head { display: flex; align-items: center; gap: 12px; min-height: 40px; }
 .sheet-head .titles { flex: 1; min-width: 0; }
 .sheet-head h2 {
-  margin: 0; font-size: 20px; font-weight: 700; line-height: 1.2;
+  margin: 0; font-size: var(--t1); font-weight: 700; line-height: 24px;
   overflow-wrap: anywhere;
 }
 .sheet-head .subtitle { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -572,7 +587,7 @@ button.list-row:active { background: var(--surface-2); }
 
 .remove-badge {
   position: absolute; z-index: 2;
-  top: 4px; left: calc(50% - var(--orb) / 2 - 8px);
+  top: -2px; left: calc(50% - var(--orb) / 2 - 8px);
   width: 24px; height: 24px; border-radius: 50%;
   display: grid; place-items: center;
   background: var(--surface); color: var(--ink);

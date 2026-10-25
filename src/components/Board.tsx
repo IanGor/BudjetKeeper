@@ -13,6 +13,7 @@ import { Settings } from './Settings'
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const INCOME_OPEN_KEY = 'bk.incomeOpen'
+const PHI = 1.618 // --phi in styles.css
 
 function readFlag(key: string): boolean {
   try {
@@ -235,8 +236,7 @@ interface PagerProps {
  *
  * The pager is full-bleed: each page is gutter + cols columns + gutter, so a
  * swipe moves the coins to the screen edge. With rows="fit" as many rows as fit
- * the height left are used (the coin height is measured: fonts differ between
- * iOS and Android).
+ * the height left are used (the coin height is measured, not assumed).
  */
 function Pager({ items, rows: rowsProp, dragKey, onPage, onPages }: PagerProps) {
   const ref = useRef<HTMLDivElement>(null)
@@ -253,8 +253,11 @@ function Pager({ items, rows: rowsProp, dragKey, onPage, onPages }: PagerProps) 
         let cell = 0
         el.querySelectorAll<HTMLElement>('.coin-cell').forEach((c) => (cell = Math.max(cell, c.offsetHeight)))
         if (!cell || !el.clientHeight) return
-        rows = Math.max(1, Math.floor(el.clientHeight / cell))
-        rowHeight = Math.max(cell, Math.floor(el.clientHeight / rows))
+        // as many rows as fit, but no empty ones when everything is on one page
+        rows = Math.max(1, Math.min(Math.floor(el.clientHeight / cell), Math.ceil(items.length / cols)))
+        // spare height is spread between the rows, up to a golden rectangle per cell
+        const golden = Math.floor((el.querySelector<HTMLElement>('.pager-cell')?.offsetWidth ?? 0) * PHI)
+        rowHeight = Math.max(cell, Math.min(Math.floor(el.clientHeight / rows), golden))
       }
       setLayout((prev) =>
         prev.cols === cols && prev.rows === rows && prev.rowHeight === rowHeight ? prev : { cols, rows, rowHeight },

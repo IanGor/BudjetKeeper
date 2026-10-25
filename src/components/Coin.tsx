@@ -86,17 +86,16 @@ export function AddTile({ label, onClick }: { label: string; onClick(): void }) 
   )
 }
 
-const ORB = 52 // --orb in styles.css
-
 export function DragGhost() {
   const { source, x, y, returning } = useDrag()
   if (!source) return null
-  // lifted above the finger while dragging so the coin stays visible; centered when landing back
-  const dy = returning ? ORB / 2 : ORB * 0.9
+  // lifted above the finger while dragging so the coin stays visible; centered when landing back.
+  // Percentages are of the ghost itself, i.e. of the orb, whose size follows the column width.
+  const dy = returning ? -50 : -90
   return (
     <div
       className={`ghost${returning ? ' returning' : ''}`}
-      style={{ transform: `translate3d(${x - ORB / 2}px, ${y - dy}px, 0)` }}
+      style={{ transform: `translate3d(${x}px, ${y}px, 0) translate(-50%, ${dy}%)` }}
     >
       <Orb entity={source} />
     </div>

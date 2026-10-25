@@ -158,3 +158,36 @@ test('a long name does not shift the amount: every row keeps one grid', async ({
   )
   expect(misaligned).toEqual([])
 })
+
+test('the board follows the golden ratio and a 4 px rhythm', async ({ board: page }) => {
+  const PHI = 1.618
+  const m = await page.locator('.expenses').evaluate((section) => {
+    const cell = section.querySelector<HTMLElement>('.pager-cell')!
+    const coin = cell.querySelector<HTMLElement>('.coin-cell')!
+    const cells = [...section.querySelectorAll<HTMLElement>('.pager-cell')]
+    const tops = [...new Set(cells.map((c) => Math.round(c.getBoundingClientRect().top)))].sort((a, b) => a - b)
+    const px = (sel: string, prop: 'height' | 'fontSize') => parseFloat(getComputedStyle(document.querySelector(sel)!)[prop])
+    return {
+      col: cell.getBoundingClientRect().width,
+      orb: coin.querySelector('.orb')!.getBoundingClientRect().width,
+      pitch: tops.length > 1 ? tops[1] - tops[0] : null,
+      slots: ['.coin-name', '.coin-amount', '.coin-plan'].map((s) => px(s, 'height')),
+      fonts: ['.coin-name', '.coin-amount', '.section-meta', '.section-title', '.large-title'].map((s) => px(s, 'fontSize')),
+    }
+  })
+  // orb : column = 1 : φ, so the gap between orbs is orb / φ
+  expect(m.orb).toBeCloseTo(m.col / PHI, 0)
+  // a cell is at most a golden rectangle
+  if (m.pitch) expect(m.pitch).toBeLessThanOrEqual(m.col * PHI + 1)
+  for (const h of m.slots) expect(h % 4, `slot height ${h}`).toBe(0)
+  // type scale with step √φ: 12, 15, 15, 19, 31
+  expect(m.fonts).toEqual([12, 15, 15, 19, 31])
+})
+
+test('installed on the phone: three rows of categories with income closed', async ({ board: page }) => {
+  test.skip(page.viewportSize()!.height < 800, 'short viewport (browser bars)')
+  const rows = await page.locator('.expenses .pager-cell').evaluateAll(
+    (cells) => new Set(cells.map((c) => Math.round(c.getBoundingClientRect().top))).size,
+  )
+  expect(rows).toBeGreaterThanOrEqual(3)
+})
