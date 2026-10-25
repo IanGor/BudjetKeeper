@@ -7,6 +7,11 @@ export function monthStart(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
+/** Milliseconds from `now` to 00:00 of the 1st of the next month, local time. */
+export function msToNextMonth(now: Date = new Date()): number {
+  return new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime() - now.getTime()
+}
+
 export function todayISO(d: Date = new Date()): string {
   return `${monthStart(d).slice(0, 8)}${String(d.getDate()).padStart(2, '0')}`
 }

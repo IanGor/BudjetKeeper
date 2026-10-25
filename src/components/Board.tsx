@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { orderedKind, stopEditing, useArrange } from '../hooks/useArrange'
 import { useDrag } from '../hooks/useCoinDrag'
 import { useFlip } from '../hooks/useFlip'
+import { useMonthRollover } from '../hooks/useMonthRollover'
 import { useRealtime } from '../hooks/useRealtime'
 import { formatRub } from '../lib/money'
 import type { Entity, EntityKind } from '../lib/types'
@@ -34,6 +35,7 @@ function writeFlag(key: string, value: boolean) {
 
 export function Board() {
   useRealtime()
+  useMonthRollover()
   const entities = useBudget((s) => s.entities)
   const totals = useBudget((s) => s.totals)
   const month = useBudget((s) => s.month)

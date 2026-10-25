@@ -140,8 +140,10 @@ export const useBudget = create<BudgetState>((set, get) => {
       refreshing = (async () => {
         do {
           refreshAgain = false
-          const { data, error } = await supabase.rpc('entity_totals', { p_month: get().month })
-          if (!error) set({ totals: toTotals(data) })
+          // always the current month: past midnight on the 1st the sums start over
+          const month = monthStart()
+          const { data, error } = await supabase.rpc('entity_totals', { p_month: month })
+          if (!error) set({ month, totals: toTotals(data) })
         } while (refreshAgain)
       })()
       try {

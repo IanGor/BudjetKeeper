@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adjustmentFor, applyTransaction, inMonth, monthStart, todayISO } from './totals'
+import { adjustmentFor, applyTransaction, inMonth, monthStart, msToNextMonth, todayISO } from './totals'
 import type { Entity, EntityKind } from './types'
 
 const ent = (id: string, kind: EntityKind) => ({ id, kind }) as Entity
@@ -20,6 +20,21 @@ describe('date helpers', () => {
   it('checks month membership', () => {
     expect(inMonth('2026-10-31', month)).toBe(true)
     expect(inMonth('2026-09-30', month)).toBe(false)
+  })
+})
+
+describe('msToNextMonth', () => {
+  it('counts to 00:00 of the 1st, local time', () => {
+    expect(msToNextMonth(new Date(2026, 9, 31, 23, 59, 50))).toBe(10_000)
+    expect(msToNextMonth(new Date(2026, 9, 1, 0, 0, 0))).toBe(new Date(2026, 10, 1).getTime() - new Date(2026, 9, 1).getTime())
+  })
+  it('crosses the year', () => {
+    expect(msToNextMonth(new Date(2026, 11, 31, 23, 0))).toBe(60 * 60 * 1000)
+  })
+  it('a second after midnight is already the new month', () => {
+    const d = new Date(2026, 10, 1, 0, 0, 1)
+    expect(monthStart(d)).toBe('2026-11-01')
+    expect(msToNextMonth(d)).toBeGreaterThan(29 * 24 * 60 * 60 * 1000)
   })
 })
 
