@@ -1,6 +1,7 @@
 import { ChevronDown, Settings2, Star, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { orderedKind, stopEditing, useArrange } from '../hooks/useArrange'
+import { useDrag } from '../hooks/useCoinDrag'
 import { useFlip } from '../hooks/useFlip'
 import { useRealtime } from '../hooks/useRealtime'
 import { formatRub } from '../lib/money'
@@ -39,6 +40,7 @@ export function Board() {
   const householdName = useBudget((s) => s.household?.name)
   const updateEntity = useBudget((s) => s.updateEntity)
   const editing = useArrange((s) => s.editing)
+  const dragging = useDrag((s) => s.source !== null)
   const draft = useArrange((s) => s.draft)
 
   const [flow, setFlow] = useState<{ from: Entity; to: Entity } | null>(null)
@@ -104,7 +106,7 @@ export function Board() {
   return (
     <div
       ref={boardRef}
-      className={`board${editing ? ' editing' : ''}`}
+      className={`board${editing ? ' editing' : ''}${dragging ? ' dragging' : ''}`}
       // tapping empty space leaves edit mode, as on the home screen
       onPointerDown={(e) => editing && !(e.target as Element).closest('.coin-slot, button') && stopEditing()}
     >

@@ -44,8 +44,12 @@ export function useDropRole(entity: Entity): DropRole {
 const MOVE_THRESHOLD = 6
 const LONG_PRESS_MS = 200 // hold to pick up money
 const EDIT_PRESS_MS = 550 // keep holding without moving: edit mode (like the iOS home screen)
-const EDGE = 32
-const EDGE_FLIP_MS = 550
+// Page flips while dragging: only at the very screen edge (the gutter, not a coin's
+// own cell), after a dwell, so aiming at a corner coin never throws the page away.
+const EDGE = 20
+const EDGE_DWELL_MS = 700
+const EDGE_REPEAT_MS = 900
+const FLIP_MS = 450 // a smooth page flip takes about this long
 
 interface Options {
   entity: Entity
@@ -88,6 +92,7 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
     let edgeTimer = 0
     let returnTimer = 0
     let edgeKey = ''
+    let flippingUntil = 0
     let lastOver: string | null = null
 
     const activate = (x: number, y: number) => {
@@ -117,6 +122,18 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
       return target && target.id !== opts.current.entity.id ? target : null
     }
 
+    // the empty cells after the last coin of a section: dropping there moves the coin to the end
+    const endOfSection = (x: number, y: number): Entity | null => {
+      const area = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-drag-scroll]')
+      const coins = area?.querySelectorAll<HTMLElement>('[data-entity-id]')
+      const last = coins?.[coins.length - 1]
+      if (!last) return null
+      const r = last.getBoundingClientRect()
+      if (!(y > r.bottom || (y >= r.top && x > r.right))) return null
+      const target = opts.current.entities[last.dataset.entityId!]
+      return target && target.id !== opts.current.entity.id ? target : null
+    }
+
     const targetAt = (x: number, y: number): Entity | null => {
       const target = entityAt(x, y)
       return target && canFlow(opts.current.entity.kind, target.kind) ? target : null
@@ -135,19 +152,25 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
       }
       if (key === edgeKey) return
       edgeKey = key
-      window.clearInterval(edgeTimer)
+      window.clearTimeout(edgeTimer)
       if (area && dir) {
-        edgeTimer = window.setInterval(
-          () => area.scrollBy({ left: dir * area.clientWidth, behavior: 'smooth' }),
-          EDGE_FLIP_MS,
-        )
+        const flip = () => {
+          // to an exact page: snapping is off while dragging (.board.dragging), so a
+          // relative scroll could stop between pages, and with snapping on, the browser
+          // pulled a half-done flip back to where it started
+          const page = Math.round(area.scrollLeft / area.clientWidth) + dir
+          area.scrollTo({ left: page * area.clientWidth, behavior: 'smooth' })
+          flippingUntil = performance.now() + FLIP_MS
+          edgeTimer = window.setTimeout(flip, EDGE_REPEAT_MS)
+        }
+        edgeTimer = window.setTimeout(flip, EDGE_DWELL_MS)
       }
     }
 
     const reset = (clearGhost = true) => {
       window.clearTimeout(pressTimer)
       window.clearTimeout(editTimer)
-      window.clearInterval(edgeTimer)
+      window.clearTimeout(edgeTimer)
       edgeKey = ''
       pointerId = null
       holding = false
@@ -171,6 +194,9 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
 
     const onPointerDown = (e: PointerEvent) => {
       if (pointerId !== null || (e.pointerType === 'mouse' && e.button !== 0)) return
+      // a held mouse button near the edge of a row starts the browser's own
+      // selection autoscroll, which runs the row away under the coin
+      if (e.pointerType === 'mouse') e.preventDefault()
       pointerId = e.pointerId
       startX = e.clientX
       startY = e.clientY
@@ -202,8 +228,10 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
         activate(e.clientX, e.clientY)
       }
 
+      // coins sliding under a still finger during a page flip are no targets
+      const flipping = performance.now() < flippingUntil
       if (mode === 'reorder') {
-        const target = entityAt(e.clientX, e.clientY)
+        const target = flipping ? null : (entityAt(e.clientX, e.clientY) ?? endOfSection(e.clientX, e.clientY))
         // react once per target: the slots shift under the finger after a move
         if (target && target.id !== lastOver) moveOver(opts.current.entity, target)
         lastOver = target?.id ?? lastOver
@@ -212,7 +240,7 @@ export function useCoinDrag({ entity, entities, onTap, onDrop }: Options) {
         return
       }
 
-      const target = targetAt(e.clientX, e.clientY)
+      const target = flipping ? null : targetAt(e.clientX, e.clientY)
       const overId = target?.id ?? null
       // a light tick when the coin snaps onto a new target (Android; iOS has no Vibration API)
       if (overId && overId !== lastOver) navigator.vibrate?.(5)

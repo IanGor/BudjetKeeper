@@ -203,6 +203,8 @@ input, textarea { font: inherit; color: inherit; }
   scrollbar-width: none;
 }
 .pager.fit { flex: 1; min-height: 0; }
+/* pages are flipped by the drag itself (to exact page offsets): snapping would fight it */
+.dragging .pager { scroll-snap-type: none; }
 .pager::-webkit-scrollbar { display: none; }
 .pager-cell { min-width: 0; min-height: 0; }
 /* page dots ride in the section head, after the title */
