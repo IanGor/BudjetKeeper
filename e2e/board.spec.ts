@@ -22,7 +22,7 @@ for (const incomeOpen of [false, true]) {
     const vh = page.viewportSize()!.height
     expect(box!.y + box!.height).toBeLessThanOrEqual(vh + 0.5)
 
-    const grid = await page.locator('.pager').evaluate((pager) => {
+    const grid = await page.locator('.expenses .pager').evaluate((pager) => {
       const p = pager.getBoundingClientRect()
       const cells = [...pager.querySelectorAll<HTMLElement>('.pager-cell')]
       const firstPage = cells.filter((c) => {
@@ -48,7 +48,7 @@ test('a tall screen has room for at least two rows of categories with income ope
   test.skip(page.viewportSize()!.height < 800, 'short viewport (browser bars)')
   await page.getByRole('button', { name: /Доходы/ }).click()
   await page.waitForTimeout(450)
-  const rows = await page.locator('.pager').evaluate((pager) => {
+  const rows = await page.locator('.expenses .pager').evaluate((pager) => {
     const p = pager.getBoundingClientRect()
     const tops = [...pager.querySelectorAll('.pager-cell')]
       .map((c) => c.getBoundingClientRect())
@@ -61,8 +61,8 @@ test('a tall screen has room for at least two rows of categories with income ope
 
 test('categories page horizontally and the dots follow', async ({ board: page }) => {
   // eleven tiles: the iPhone in Safari has room for two rows only
-  const pager = page.locator('.pager')
-  const dots = page.locator('.dot')
+  const pager = page.locator('.expenses .pager')
+  const dots = page.locator('.expenses .dot')
   if ((await dots.count()) === 0) test.skip(true, 'all categories fit on one page')
   await pager.evaluate((el) => el.scrollTo({ left: el.clientWidth }))
   await expect(dots.nth(1)).toHaveClass(/on/)
@@ -92,4 +92,38 @@ test('amounts are whole rubles and the largest ones fit their coin', async ({ bo
     ),
   )
   expect(wider, 'amounts wider than their coin').toEqual([])
+})
+
+test('incomes, accounts and categories share one grid of 4 equal, symmetric columns', async ({ board: page }) => {
+  await page.getByRole('button', { name: /Доходы/ }).click()
+  await page.waitForTimeout(450)
+  const vw = page.viewportSize()!.width
+  const sections = await page.locator('.section').evaluateAll((els) =>
+    els.map((section) => {
+      const pager = section.querySelector('.pager')!.getBoundingClientRect()
+      // the cells of the page in view
+      const cells = [...section.querySelectorAll('.pager-cell')]
+        .map((c) => c.getBoundingClientRect())
+        .filter((r) => r.left >= pager.left - 1 && r.right <= pager.right + 1)
+      const firstRow = cells.filter((r) => Math.abs(r.top - cells[0].top) < 1)
+      const orbs = [...section.querySelectorAll('.orb')].map((o) => o.getBoundingClientRect().width)
+      return {
+        lefts: firstRow.map((r) => Math.round(r.left)),
+        widths: firstRow.map((r) => r.width),
+        orbs: [...new Set(orbs.map(Math.round))],
+      }
+    }),
+  )
+  expect(sections).toHaveLength(3)
+  for (const s of sections) {
+    expect(s.lefts, 'four coins per row').toHaveLength(4)
+    expect(s.orbs, 'one orb size').toHaveLength(1)
+    for (const w of s.widths) expect(w).toBeCloseTo(s.widths[0], 0)
+    expect(s.lefts, 'columns line up across sections').toEqual(sections[0].lefts)
+  }
+  expect(sections[0].orbs).toEqual(sections[2].orbs)
+  // the row is centered on the screen: equal margins left and right
+  const [first, , , last] = sections[0].lefts
+  const right = vw - (last + sections[0].widths[3])
+  expect(Math.abs(first - right)).toBeLessThanOrEqual(1)
 })

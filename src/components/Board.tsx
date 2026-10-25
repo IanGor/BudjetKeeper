@@ -126,40 +126,31 @@ export function Board() {
         )}
       </header>
 
-      <section className="section">
-        <button type="button" className="section-head" onClick={toggleIncome} aria-expanded={incomeOpen}>
-          <span className="section-title">Доходы</span>
-          <span className="section-meta">{formatRub(incomeSum)}</span>
-          <ChevronDown size={18} className={`chevron${incomeOpen ? ' open' : ''}`} />
-        </button>
-        <div className={`collapse${incomeOpen ? ' open' : ''}`}>
-          <div>
-            <div className="row" data-drag-scroll="income">
-              {incomes.map(coin)}
-              {add('income', 'Источник')}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="section-head">
-          <span className="section-title">Счета</span>
-          <span className={`section-meta${balance < 0 ? ' neg' : ''}`}>{formatRub(balance)}</span>
-        </div>
-        <div className="row" data-drag-scroll="accounts">
-          {accounts.map(coin)}
-          {add('account', 'Счёт')}
-        </div>
-      </section>
-
-      <section className="section expenses">
-        <div className="section-head">
-          <span className="section-title">Расходы</span>
-          <span className="section-meta">{formatRub(expenseSum)}</span>
-        </div>
-        <CategoryPager items={[...expenses.map(coin), add('expense', 'Категория')].filter(Boolean)} />
-      </section>
+      <PagedSection
+        title="Доходы"
+        meta={formatRub(incomeSum)}
+        open={incomeOpen}
+        onToggle={toggleIncome}
+        dragKey="income"
+        rows={1}
+        items={[...incomes.map(coin), add('income', 'Источник')]}
+      />
+      <PagedSection
+        title="Счета"
+        meta={formatRub(balance)}
+        neg={balance < 0}
+        dragKey="accounts"
+        rows={1}
+        items={[...accounts.map(coin), add('account', 'Счёт')]}
+      />
+      <PagedSection
+        className="expenses"
+        title="Расходы"
+        meta={formatRub(expenseSum)}
+        dragKey="expenses"
+        rows="fit"
+        items={[...expenses.map(coin), add('expense', 'Категория')]}
+      />
 
       <DragGhost />
       {flow && <AmountSheet from={flow.from} to={flow.to} onClose={() => setFlow(null)} />}
@@ -170,30 +161,101 @@ export function Board() {
   )
 }
 
+interface PagedSectionProps {
+  title: string
+  meta: string
+  neg?: boolean
+  className?: string
+  /** collapsible section: the head toggles it */
+  open?: boolean
+  onToggle?(): void
+  dragKey: string
+  rows: number | 'fit'
+  items: ReactNode[]
+}
+
 /**
- * Categories in pages of cols×rows. All cells share one grid parent and are
- * placed page by page, so a coin dragged to another page keeps its element
- * (no remount mid-gesture) and glides there.
- *
- * Rows are fitted to the space that is left: the height of a coin is measured
- * (fonts and line heights differ between iOS and Android), as many rows as fit
- * are used, and the spare height is spread between them.
+ * A section of coins on one grid: `--cols` equal columns across the content
+ * width, the same in every section, paged sideways. Page dots sit in the head.
  */
-function CategoryPager({ items }: { items: ReactNode[] }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [layout, setLayout] = useState({ cols: 4, rows: 3, rowHeight: 0 })
+function PagedSection({ title, meta, neg, className, open, onToggle, dragKey, rows, items }: PagedSectionProps) {
   const [page, setPage] = useState(0)
+  const [pages, setPages] = useState(1)
+  const collapsible = onToggle !== undefined
+  const shown = items.filter(Boolean)
+
+  const head = (
+    <>
+      <span className="section-title">{title}</span>
+      {pages > 1 && (
+        <span className="dots" aria-hidden="true">
+          {Array.from({ length: pages }, (_, i) => (
+            <span key={i} className={`dot${i === page ? ' on' : ''}`} />
+          ))}
+        </span>
+      )}
+      <span className={`section-meta${neg ? ' neg' : ''}`}>{meta}</span>
+      {collapsible && <ChevronDown size={18} className={`chevron${open ? ' open' : ''}`} />}
+    </>
+  )
+  const pager = <Pager items={shown} rows={rows} dragKey={dragKey} onPage={setPage} onPages={setPages} />
+
+  return (
+    <section className={`section${className ? ` ${className}` : ''}`}>
+      {collapsible ? (
+        <button type="button" className="section-head" onClick={onToggle} aria-expanded={open}>
+          {head}
+        </button>
+      ) : (
+        <div className="section-head">{head}</div>
+      )}
+      {collapsible ? (
+        <div className={`collapse${open ? ' open' : ''}`}>
+          <div>{pager}</div>
+        </div>
+      ) : (
+        pager
+      )}
+    </section>
+  )
+}
+
+interface PagerProps {
+  items: ReactNode[]
+  rows: number | 'fit'
+  dragKey: string
+  onPage(page: number): void
+  onPages(pages: number): void
+}
+
+/**
+ * Coins in pages of cols×rows. All cells share one grid parent and are placed
+ * page by page, so a coin dragged to another page keeps its element (no remount
+ * mid-gesture) and glides there.
+ *
+ * The pager is full-bleed: each page is gutter + cols columns + gutter, so a
+ * swipe moves the coins to the screen edge. With rows="fit" as many rows as fit
+ * the height left are used (the coin height is measured: fonts differ between
+ * iOS and Android).
+ */
+function Pager({ items, rows: rowsProp, dragKey, onPage, onPages }: PagerProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [layout, setLayout] = useState({ cols: 4, rows: rowsProp === 'fit' ? 3 : rowsProp, rowHeight: 0 })
 
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const measure = () => {
-      let cell = 0
-      el.querySelectorAll<HTMLElement>('.coin-cell').forEach((c) => (cell = Math.max(cell, c.offsetHeight)))
-      if (!cell || !el.clientHeight) return
-      const cols = el.clientWidth >= 600 ? 6 : 4
-      const rows = Math.max(1, Math.floor(el.clientHeight / cell))
-      const rowHeight = Math.max(cell, Math.floor(el.clientHeight / rows))
+      const cols = Number(getComputedStyle(el).getPropertyValue('--cols')) || 4
+      let rows = typeof rowsProp === 'number' ? rowsProp : 1
+      let rowHeight = 0
+      if (rowsProp === 'fit') {
+        let cell = 0
+        el.querySelectorAll<HTMLElement>('.coin-cell').forEach((c) => (cell = Math.max(cell, c.offsetHeight)))
+        if (!cell || !el.clientHeight) return
+        rows = Math.max(1, Math.floor(el.clientHeight / cell))
+        rowHeight = Math.max(cell, Math.floor(el.clientHeight / rows))
+      }
       setLayout((prev) =>
         prev.cols === cols && prev.rows === rows && prev.rowHeight === rowHeight ? prev : { cols, rows, rowHeight },
       )
@@ -202,47 +264,41 @@ function CategoryPager({ items }: { items: ReactNode[] }) {
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [items.length])
+  }, [items.length, rowsProp])
 
   const { cols, rows } = layout
   const perPage = cols * rows
   const pages = Math.max(1, Math.ceil(items.length / perPage))
+  useEffect(() => onPages(pages), [pages, onPages])
+
+  const page = `var(--gutter) repeat(${cols}, calc((100% - 2 * var(--gutter)) / ${cols})) var(--gutter)`
 
   return (
-    <>
-      <div
-        ref={ref}
-        className="pager"
-        data-drag-scroll="expenses"
-        style={{
-          gridTemplateColumns: `repeat(${pages * cols}, calc(100% / ${cols}))`,
-          // pages share row tracks; fixed rows keep a tall cell on one page from stretching the others
-          gridAutoRows: layout.rowHeight ? `${layout.rowHeight}px` : 'min-content',
-        }}
-        onScroll={(e) => setPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
-      >
-        {items.map((item, i) => {
-          const p = Math.floor(i / perPage)
-          const r = Math.floor((i % perPage) / cols)
-          const c = i % cols
-          return (
-            <div
-              key={(item as { key?: string }).key ?? i}
-              className="pager-cell"
-              style={{ gridColumn: p * cols + c + 1, gridRow: r + 1, scrollSnapAlign: i % perPage === 0 ? 'start' : undefined }}
-            >
-              {item}
-            </div>
-          )
-        })}
-      </div>
-      {pages > 1 && (
-        <div className="dots">
-          {Array.from({ length: pages }, (_, i) => (
-            <span key={i} className={`dot${i === page ? ' on' : ''}`} />
-          ))}
-        </div>
-      )}
-    </>
+    <div
+      ref={ref}
+      className={`pager${rowsProp === 'fit' ? ' fit' : ''}`}
+      data-drag-scroll={dragKey}
+      style={{
+        gridTemplateColumns: Array(pages).fill(page).join(' '),
+        // pages share row tracks; fixed rows keep a tall cell on one page from stretching the others
+        gridAutoRows: layout.rowHeight ? `${layout.rowHeight}px` : 'min-content',
+      }}
+      onScroll={(e) => onPage(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
+    >
+      {items.map((item, i) => {
+        const p = Math.floor(i / perPage)
+        const r = Math.floor((i % perPage) / cols)
+        const c = i % cols
+        return (
+          <div
+            key={(item as { key?: string }).key ?? i}
+            className="pager-cell"
+            style={{ gridColumn: p * (cols + 2) + c + 2, gridRow: r + 1, scrollSnapAlign: i % perPage === 0 ? 'start' : undefined }}
+          >
+            {item}
+          </div>
+        )
+      })}
+    </div>
   )
 }

@@ -5,7 +5,7 @@ import { expect, test } from './fixtures'
 // the amount turns bright red once spending goes beyond the plan.
 
 function category(page: Page, name: string) {
-  const coin = page.locator('.pager [data-entity-id]', { hasText: name })
+  const coin = page.locator('.expenses [data-entity-id]', { hasText: name })
   return coin.evaluate((el) => {
     const orb = el.querySelector<HTMLElement>('.orb')!
     const fill = el.querySelector<HTMLElement>('.orb-fill')!
