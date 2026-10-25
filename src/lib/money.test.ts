@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { evalExpression, formatRub, formatRubShort, parseRub } from './money'
+import { evalExpression, formatRub, formatRubWhole, MAX_KOPECKS, parseRub } from './money'
 
-const n = (s: string) => s.replace(/ /g, ' ')
+const n = (s: string) => s.replace(/[\u00a0\u202f]/g, ' ')
 
 describe('formatRub', () => {
   it('groups thousands and hides zero kopecks', () => {
@@ -18,12 +18,20 @@ describe('formatRub', () => {
   })
 })
 
-describe('formatRubShort', () => {
-  it('compacts large values', () => {
-    expect(n(formatRubShort(9_999_900))).toBe('99 999')
-    expect(n(formatRubShort(12_345_600))).toBe('123,5 тыс')
-    expect(n(formatRubShort(250_000_000))).toBe('2,5 млн')
-    expect(n(formatRubShort(-50_000))).toBe('−500')
+describe('formatRubWhole', () => {
+  it('prints every digit of whole rubles, without units', () => {
+    expect(n(formatRubWhole(0))).toBe('0')
+    expect(n(formatRubWhole(2_222_100))).toBe('22 221')
+    expect(n(formatRubWhole(14_000_000))).toBe('140 000')
+    expect(n(formatRubWhole(MAX_KOPECKS))).toBe('99 999 999')
+    expect(n(formatRubWhole(-MAX_KOPECKS))).toBe('−99 999 999')
+  })
+  it('rounds kopecks to rubles', () => {
+    expect(formatRubWhole(12_345_650)).toBe(formatRubWhole(12_345_700))
+    expect(n(formatRubWhole(-50_000))).toBe('−500')
+  })
+  it('groups with narrow no-break spaces so the number never wraps', () => {
+    expect(formatRubWhole(123_456_700)).toBe('1\u202f234\u202f567')
   })
 })
 
@@ -38,6 +46,10 @@ describe('parseRub', () => {
     expect(parseRub('1,234')).toBeNull()
     expect(parseRub('-5')).toBeNull()
     expect(parseRub('abc')).toBeNull()
+    expect(parseRub('100000000')).toBeNull()
+  })
+  it('accepts up to 99 999 999 ₽', () => {
+    expect(parseRub('99 999 999')).toBe(MAX_KOPECKS)
   })
 })
 

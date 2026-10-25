@@ -45,7 +45,7 @@ test('expense: drag an account onto a category, type the sum, done', async ({ bo
   await expect(done).toBeInViewport({ ratio: 1 })
   await done.click()
   await expect(sheet).toBeHidden()
-  await expect(amount).toHaveText(String(before + 150).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0'))
+  await expect(amount).toHaveText(String(before + 150).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f'))
 })
 
 test('category sheet: operations, then settings', async ({ board: page }) => {

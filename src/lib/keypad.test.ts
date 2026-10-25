@@ -16,6 +16,12 @@ describe('pressKey', () => {
     expect(type(['1', ',', ',', '2'])).toBe('1,2')
     expect(type(['1', ',', '2', '+', ',', '3'])).toBe('1,2+0,3')
   })
+  it('takes at most 8 digits of rubles per number: 99 999 999 ₽', () => {
+    const nines = Array<Key>(9).fill('9')
+    expect(type(nines)).toBe('99999999')
+    expect(type([...nines, ',', '5'])).toBe('99999999,5')
+    expect(type(['1', '+', ...nines])).toBe('1+99999999')
+  })
   it('limits kopecks to two digits', () => {
     expect(type(['1', ',', '2', '3', '4'])).toBe('1,23')
   })

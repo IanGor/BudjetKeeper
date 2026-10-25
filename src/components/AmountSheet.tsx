@@ -2,7 +2,7 @@ import { ArrowRight, Delete } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useOnline } from '../hooks/useOnline'
 import { hasOperator, kopecksToInput, pressKey, type Key } from '../lib/keypad'
-import { evalExpression, formatRub } from '../lib/money'
+import { evalExpression, formatRub, MAX_KOPECKS } from '../lib/money'
 import { flowLabel } from '../lib/rules'
 import { adjustmentFor, todayISO } from '../lib/totals'
 import type { Entity, Transaction } from '../lib/types'
@@ -38,7 +38,7 @@ export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
   const amount = evalExpression(expr)
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date)
   const delta = balance && amount !== null ? amount - balance.current : 0
-  const valid = dateOk && amount !== null && (balance ? delta !== 0 : amount > 0)
+  const valid = dateOk && amount !== null && amount <= MAX_KOPECKS && (balance ? delta !== 0 : amount > 0)
 
   const isAdjustment = !balance && (from === null || to === null)
   const account = balance?.account ?? (isAdjustment ? (from ?? to) : null)

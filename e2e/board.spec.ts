@@ -74,3 +74,22 @@ test('long names wrap to two lines instead of overflowing', async ({ board: page
   expect(lines).toBeLessThanOrEqual(2)
   await expect(name).toHaveText('Красота и одежда')
 })
+
+test('amounts are whole rubles and the largest ones fit their coin', async ({ board: page }) => {
+  const coins = page.locator('[data-entity-id]')
+  await expect(coins.filter({ hasText: 'Вклад' }).locator('.coin-amount')).toHaveText('99\u202f999\u202f999')
+  await expect(coins.filter({ hasText: 'Путешествия' }).locator('.coin-amount')).toHaveText('−99\u202f999\u202f999')
+  await expect(coins.filter({ hasText: 'Подписки' }).locator('.coin-amount').last()).toHaveText('99\u202f999\u202f999')
+  // no "тыс"/"млн" anywhere: every caption is digits only
+  for (const text of await page.locator('.coin-amount, .coin-plan').allTextContents()) {
+    expect(text).toMatch(/^(из )?−?\d{1,3}(\u202f\d{3})*$/)
+  }
+  const wider = await page.locator('.coin-cell').evaluateAll((cells) =>
+    cells.flatMap((cell) =>
+      [...cell.querySelectorAll<HTMLElement>('.coin-amount, .coin-plan')]
+        .filter((t) => t.getBoundingClientRect().width > cell.clientWidth)
+        .map((t) => t.textContent),
+    ),
+  )
+  expect(wider, 'amounts wider than their coin').toEqual([])
+})

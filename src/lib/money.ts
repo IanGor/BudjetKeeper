@@ -14,25 +14,27 @@ export function formatRub(kopecks: number, withSign = false): string {
   return `${sign}${groupThousands(rub)}${tail}${NBSP}₽`
 }
 
-/** Short form for coin captions: 1 234 ₽, 12,3 тыс, 1,2 млн. */
-export function formatRubShort(kopecks: number): string {
+/** Largest amount of an account, a category or a single operation: 99 999 999 ₽. */
+export const MAX_KOPECKS = 99_999_999_00
+/** Narrow no-break space: digit groups stay readable but take a third less width. */
+const NNBSP = '\u202f'
+
+/**
+ * Coin captions: whole rubles with every digit, no ₽ (the only currency) and no
+ * "тыс"/"млн", so amounts compare at a glance. "−99 999 999" fits a coin column.
+ */
+export function formatRubWhole(kopecks: number): string {
   const rub = Math.round(kopecks / 100)
-  const abs = Math.abs(rub)
   const sign = rub < 0 ? '−' : ''
-  if (abs < 100_000) return `${sign}${groupThousands(abs)}`
-  if (abs < 1_000_000) return `${sign}${trimNum(abs / 1000)}${NBSP}тыс`
-  return `${sign}${trimNum(abs / 1_000_000)}${NBSP}млн`
+  return sign + String(Math.abs(rub)).replace(/\B(?=(\d{3})+(?!\d))/g, NNBSP)
 }
 
-function trimNum(n: number): string {
-  return (Math.round(n * 10) / 10).toString().replace('.', ',')
-}
-
-/** "1 234,5" -> 123450; null when not a valid non-negative amount. */
+/** "1 234,5" -> 123450; null when not a valid non-negative amount up to MAX_KOPECKS. */
 export function parseRub(input: string): number | null {
-  const s = input.replace(/[\s ₽]/g, '').replace(',', '.')
+  const s = input.replace(/[\s\u00a0\u202f₽]/g, '').replace(',', '.')
   if (!/^\d+(\.\d{0,2})?$/.test(s)) return null
-  return Math.round(parseFloat(s) * 100)
+  const kopecks = Math.round(parseFloat(s) * 100)
+  return kopecks <= MAX_KOPECKS ? kopecks : null
 }
 
 export const OPERATORS = ['+', '−', '×', '÷'] as const

@@ -49,6 +49,9 @@ const FLOWS: [string, string, number][] = [
   ['account:Этот месяц', 'expense:Еда в городе', 2750000],
   ['account:Этот месяц', 'expense:Красота одежда', 1234500],
   ['account:Ремонт', 'expense:ЖКХ', 1830000],
+  // the largest amounts the app allows (99 999 999 ₽), positive and negative
+  ['income:Авито', 'account:Вклад', 9999999900],
+  ['account:Путешествия', 'expense:Подписки', 9999999900],
 ]
 
 export async function seed() {

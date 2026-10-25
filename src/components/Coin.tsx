@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react'
 import { useArrange } from '../hooks/useArrange'
 import { useDrag, useCoinDrag, useDropRole } from '../hooks/useCoinDrag'
 import { iconFor } from '../lib/icons'
-import { formatRubShort } from '../lib/money'
+import { formatRubWhole } from '../lib/money'
 import { canDragFrom, planFill } from '../lib/rules'
 import type { Entity } from '../lib/types'
 
@@ -59,8 +59,8 @@ export function Coin({ entity, total, entities, onTap, onDrop }: CoinProps) {
     >
       <Orb entity={entity} fill={gauge?.fill} />
       <span className="coin-name">{entity.name}</span>
-      <span className={`coin-amount${total < 0 ? ' neg' : ''}${gauge?.over ? ' over' : ''}`}>{formatRubShort(total)}</span>
-      {hasPlan && <span className="coin-plan">из {formatRubShort(plan)}</span>}
+      <span className={`coin-amount${total < 0 ? ' neg' : ''}${gauge?.over ? ' over' : ''}`}>{formatRubWhole(total)}</span>
+      {hasPlan && <span className="coin-plan">из {formatRubWhole(plan)}</span>}
     </button>
   )
 }

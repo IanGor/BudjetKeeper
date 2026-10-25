@@ -1,8 +1,10 @@
-import { OPERATORS } from './money'
+import { MAX_KOPECKS, OPERATORS } from './money'
 
 export type Key = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | ',' | 'back' | (typeof OPERATORS)[number]
 
 const MAX_LENGTH = 32
+/** digits before the comma: 99 999 999 ₽ is the largest amount */
+const MAX_RUB_DIGITS = String(MAX_KOPECKS / 100).length
 const isOp = (ch: string | undefined) => ch !== undefined && (OPERATORS as readonly string[]).includes(ch)
 
 /** Applies one calculator key press to the expression string. */
@@ -31,6 +33,7 @@ export function pressKey(expr: string, key: Key): string {
   const comma = current.indexOf(',')
   if (comma >= 0 && current.length - comma > 2) return expr
   if (current === '0') return expr.slice(0, -1) + key
+  if (comma < 0 && current.length >= MAX_RUB_DIGITS) return expr
   return expr + key
 }
 
