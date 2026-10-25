@@ -39,6 +39,9 @@ const ENTITIES: Row[] = [
   ['expense', 'Подписки', 'trending-up', '#f08c3a', 5317000],
 ]
 
+// savings: kept out of the total balance
+const SAVINGS = new Set(['Вклад', 'Подушка'])
+
 // [from, to, kopecks]: income → account, account → expense
 const FLOWS: [string, string, number][] = [
   ['income:ЗП Игорь', 'account:Этот месяц', 123456700],
@@ -86,6 +89,7 @@ export async function seed() {
   const pos: Record<string, number> = {}
   const rows = ENTITIES.map(([kind, name, icon, color, plan]) => ({
     household_id: hid, kind, name, icon, color, plan_kopecks: plan ?? null, position: (pos[kind] = (pos[kind] ?? -1) + 1),
+    in_balance: !(kind === 'account' && SAVINGS.has(name)),
   }))
   const ins = await admin.from('entities').insert(rows).select('id, kind, name')
   if (ins.error) throw ins.error

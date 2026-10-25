@@ -190,6 +190,32 @@ input, textarea { font: inherit; color: inherit; }
 
 .expenses { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
+/* the month at a glance: spent of the plan, money on the accounts */
+.plan-bar { flex: none; padding: 8px 0 4px; border-top: 1px solid var(--hairline); }
+.plan-bar-text {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  font-size: var(--t-1); line-height: 20px; color: var(--muted); white-space: nowrap;
+}
+.plan-bar-text strong { font-size: var(--t0); font-weight: 650; color: var(--ink); }
+.plan-bar-text .over strong, .plan-bar-text .short strong { color: var(--over); }
+.plan-bar-track {
+  position: relative; height: 8px; margin-top: 4px;
+  border-radius: 4px; background: var(--surface-2); overflow: hidden;
+}
+.plan-bar-fill {
+  position: absolute; inset: 0 auto 0 0;
+  width: calc(var(--fill, 0) * 100%);
+  border-radius: inherit; background: var(--accent);
+  transition: width 0.5s var(--ease-out);
+}
+.plan-bar-track.over .plan-bar-fill { background: var(--over); }
+/* today: spending to the right of it runs ahead of the month */
+.plan-bar-today {
+  position: absolute; top: 0; bottom: 0; width: 2px;
+  left: calc(var(--elapsed, 0) * 100% - 1px);
+  background: var(--ink); opacity: 0.35;
+}
+
 /* full-bleed: a page is gutter + cols columns + gutter (see Pager), so coins
    slide to the screen edge while at rest they line up with the headers */
 .pager {
@@ -284,6 +310,8 @@ input, textarea { font: inherit; color: inherit; }
 .coin-amount.neg { color: var(--error); }
 /* spent beyond the plan */
 .coin-amount.over { color: var(--over); }
+/* an account kept out of the total balance (savings) */
+.coin-amount.aside { color: var(--muted); }
 .coin-plan { height: 16px; font-size: min(var(--t-1), 100cqi / var(--ems, 1)); line-height: 16px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .add-tile .coin-name { color: var(--accent); }
 
@@ -511,6 +539,31 @@ button.list-row:active { background: var(--surface-2); }
 }
 .empty { color: var(--muted); text-align: center; padding: 22px 0; font-size: 15px; }
 
+/* a setting with an on/off switch, as in iOS Settings */
+.switch-row {
+  display: flex; align-items: center; gap: 12px;
+  margin: 12px 0; padding: 10px 12px;
+  border-radius: 10px; background: var(--surface-2);
+  cursor: pointer;
+}
+.switch-row .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 15px; }
+.switch-row .sub { font-size: 12px; line-height: 16px; color: var(--muted); }
+.switch {
+  flex: none; position: relative;
+  width: 51px; height: 31px; margin: 0; border-radius: 16px;
+  -webkit-appearance: none; appearance: none;
+  background: var(--faint); cursor: pointer;
+  transition: background-color 0.2s var(--ease-out);
+}
+.switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 27px; height: 27px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.25s var(--ease-out);
+}
+.switch:checked { background: var(--success); }
+.switch:checked::after { transform: translateX(20px); }
+
 .invite {
   flex: 1; min-width: 0;
   font: 600 20px/1 var(--font-mono);
@@ -560,7 +613,7 @@ button.list-row:active { background: var(--surface-2); }
   .sheet, .closing .sheet { animation-name: fade-in; }
   .closing .sheet { animation-name: fade-out; }
   .toast { animation: fade-in 0.2s ease; }
-  .collapse, .chevron, .orb-fill { transition: none; }
+  .collapse, .chevron, .orb-fill, .plan-bar-fill { transition: none; }
   .coin-cell, .orb, .ghost, .ghost .orb { transition: opacity 0.15s ease; animation: none; }
   .coin-cell.role-over { transform: none; }
 }

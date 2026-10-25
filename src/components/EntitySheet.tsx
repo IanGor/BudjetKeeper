@@ -132,6 +132,7 @@ function EntityForm({ kind, entity, onDone }: { kind: EntityKind; entity?: Entit
   const [icon, setIcon] = useState(entity?.icon ?? ICON_CHOICES[kind][0])
   const [color, setColor] = useState(entity?.color ?? DEFAULT_COLOR[kind])
   const [plan, setPlan] = useState(entity?.plan_kopecks != null ? String(entity.plan_kopecks / 100).replace('.', ',') : '')
+  const [inBalance, setInBalance] = useState(entity?.in_balance ?? true)
   const [confirmArchive, setConfirmArchive] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -144,7 +145,13 @@ function EntityForm({ kind, entity, onDone }: { kind: EntityKind; entity?: Entit
   const save = async () => {
     if (!valid || busy) return
     setBusy(true)
-    const fields = { name: name.trim(), icon, color, plan_kopecks: hasPlan ? planKopecks : null }
+    const fields = {
+      name: name.trim(),
+      icon,
+      color,
+      plan_kopecks: hasPlan ? planKopecks : null,
+      ...(kind === 'account' && { in_balance: inBalance }),
+    }
     const ok = entity ? await updateEntity(entity.id, fields) : (await createEntity({ kind, ...fields })) !== null
     setBusy(false)
     if (ok) onDone()
@@ -182,6 +189,22 @@ function EntityForm({ kind, entity, onDone }: { kind: EntityKind; entity?: Entit
             onChange={(e) => setPlan(e.target.value)}
           />
           {planInvalid && <span className="error">Введите сумму, например 15000 или 999,90</span>}
+        </label>
+      )}
+
+      {kind === 'account' && (
+        <label className="switch-row">
+          <span className="main">
+            <span>Учитывать в общем балансе</span>
+            <span className="sub">Выключите для накоплений: счёт не войдёт в сумму «Счета»</span>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            className="switch"
+            checked={inBalance}
+            onChange={(e) => setInBalance(e.target.checked)}
+          />
         </label>
       )}
 

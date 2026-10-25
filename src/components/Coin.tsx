@@ -59,7 +59,10 @@ export function Coin({ entity, total, entities, onTap, onDrop }: CoinProps) {
     >
       <Orb entity={entity} fill={gauge?.fill} />
       <CoinName>{entity.name}</CoinName>
-      <Fit className={`coin-amount${total < 0 ? ' neg' : ''}${gauge?.over ? ' over' : ''}`} text={formatRubWhole(total)} />
+      <Fit
+        className={`coin-amount${total < 0 ? ' neg' : ''}${gauge?.over ? ' over' : ''}${entity.in_balance === false ? ' aside' : ''}`}
+        text={formatRubWhole(total)}
+      />
       {/* the plan line is kept even when empty, so all categories line up */}
       {entity.kind === 'expense' && <Fit className="coin-plan" text={hasPlan ? `из ${formatRubWhole(plan)}` : ''} />}
     </button>

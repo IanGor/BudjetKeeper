@@ -11,11 +11,19 @@ import { useBudget } from '../store/budget'
 import { AmountSheet } from './AmountSheet'
 import { AddTile, Coin, DragGhost } from './Coin'
 import { EntityEditor, EntitySheet } from './EntitySheet'
+import { PlanBar } from './PlanBar'
 import { Settings } from './Settings'
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const INCOME_OPEN_KEY = 'bk.incomeOpen'
 const PHI = 1.618 // --phi in styles.css
+
+/** Share of `month` (YYYY-MM-01) that has passed, 0..1. */
+function monthElapsed(month: string, now = new Date()): number {
+  const start = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1)
+  const end = new Date(start.getFullYear(), start.getMonth() + 1, 1)
+  return Math.min(Math.max((now.getTime() - start.getTime()) / (end.getTime() - start.getTime()), 0), 1)
+}
 
 function readFlag(key: string): boolean {
   try {
@@ -71,7 +79,9 @@ export function Board() {
   const sum = (list: Entity[]) => list.reduce((acc, e) => acc + (totals[e.id] ?? 0), 0)
   const incomeSum = sum(incomes)
   const expenseSum = sum(expenses)
-  const balance = sum(accounts)
+  // savings accounts can stay out of the total
+  const balance = sum(accounts.filter((a) => a.in_balance !== false))
+  const planned = expenses.reduce((acc, e) => acc + (e.plan_kopecks ?? 0), 0)
 
   const coin = (e: Entity) => (
     <div key={e.id} className="coin-slot" data-flip-id={e.id}>
@@ -156,6 +166,8 @@ export function Board() {
         rows="fit"
         items={[...expenses.map(coin), add('expense', 'Категория')]}
       />
+
+      <PlanBar spent={expenseSum} planned={planned} available={balance} elapsed={monthElapsed(month)} />
 
       <DragGhost />
       {flow && <AmountSheet from={flow.from} to={flow.to} onClose={() => setFlow(null)} />}

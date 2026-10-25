@@ -8,6 +8,8 @@ export interface Entity {
   icon: string
   color: string
   plan_kopecks: number | null
+  /** accounts only: counted in the total balance (savings can stay out) */
+  in_balance: boolean
   position: number
   archived: boolean
   created_at: string

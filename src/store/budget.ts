@@ -12,6 +12,7 @@ export interface EntityInput {
   icon: string
   color: string
   plan_kopecks: number | null
+  in_balance?: boolean
 }
 
 export interface TransactionInput {
