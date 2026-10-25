@@ -58,10 +58,20 @@ export function Coin({ entity, total, entities, onTap, onDrop }: CoinProps) {
       onClick={(e) => e.detail === 0 && !useArrange.getState().editing && onTap(entity)}
     >
       <Orb entity={entity} fill={gauge?.fill} />
-      <span className="coin-name">{entity.name}</span>
+      <CoinName>{entity.name}</CoinName>
       <span className={`coin-amount${total < 0 ? ' neg' : ''}${gauge?.over ? ' over' : ''}`}>{formatRubWhole(total)}</span>
-      {hasPlan && <span className="coin-plan">из {formatRubWhole(plan)}</span>}
+      {/* the plan line is kept even when empty, so all categories line up */}
+      {entity.kind === 'expense' && <span className="coin-plan">{hasPlan ? `из ${formatRubWhole(plan)}` : ''}</span>}
     </button>
+  )
+}
+
+/** A fixed two-line slot: short and long names alike leave the amount below at the same height. */
+function CoinName({ children }: { children: string }) {
+  return (
+    <span className="coin-name">
+      <span>{children}</span>
+    </span>
   )
 }
 
@@ -71,7 +81,7 @@ export function AddTile({ label, onClick }: { label: string; onClick(): void }) 
       <span className="orb add">
         <Plus strokeWidth={2} />
       </span>
-      <span className="coin-name">{label}</span>
+      <CoinName>{label}</CoinName>
     </button>
   )
 }

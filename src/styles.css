@@ -244,10 +244,16 @@ input, textarea { font: inherit; color: inherit; }
   width: calc(var(--orb) * 0.44); height: calc(var(--orb) * 0.44);
 }
 
-/* up to two lines for long names ("На следующий месяц") */
+/* the name has a fixed slot of two lines, centered in it: a long name never
+   moves the amount down, every coin of a row keeps the same grid */
 .coin-name {
-  margin-top: 7px; max-width: 100%; padding: 0 2px;
-  font-size: 12px; line-height: 1.2; font-weight: 500; color: var(--text-2);
+  --lh: 15px;
+  display: flex; align-items: center; justify-content: center;
+  height: calc(2 * var(--lh)); max-width: 100%;
+  margin-top: 7px; padding: 0 2px;
+  font-size: 12px; line-height: var(--lh); font-weight: 500; color: var(--text-2);
+}
+.coin-name > span {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
   overflow: hidden; overflow-wrap: anywhere;
 }
@@ -259,7 +265,7 @@ input, textarea { font: inherit; color: inherit; }
 .coin-amount.neg { color: var(--error); }
 /* spent beyond the plan */
 .coin-amount.over { color: var(--over); }
-.coin-plan { font-size: 11px; line-height: 14px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.coin-plan { min-height: 14px; font-size: 11px; line-height: 14px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .add-tile .coin-name { color: var(--accent); }
 
 /* drag feedback */

@@ -69,7 +69,7 @@ test('categories page horizontally and the dots follow', async ({ board: page })
 })
 
 test('long names wrap to two lines instead of overflowing', async ({ board: page }) => {
-  const name = page.locator('[data-entity-id]', { hasText: 'Красота и одежда' }).locator('.coin-name')
+  const name = page.locator('[data-entity-id]', { hasText: 'Красота и одежда' }).locator('.coin-name > span')
   const lines = await name.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)))
   expect(lines).toBeLessThanOrEqual(2)
   await expect(name).toHaveText('Красота и одежда')
@@ -126,4 +126,35 @@ test('incomes, accounts and categories share one grid of 4 equal, symmetric colu
   const [first, , , last] = sections[0].lefts
   const right = vw - (last + sections[0].widths[3])
   expect(Math.abs(first - right)).toBeLessThanOrEqual(1)
+})
+
+test('a long name does not shift the amount: every row keeps one grid', async ({ board: page }) => {
+  await page.getByRole('button', { name: /Доходы/ }).click()
+  await page.waitForTimeout(450)
+  // rows of coins in view, per section; one entry per row: the distinct tops of each part
+  const misaligned = await page.locator('.section').evaluateAll((sections) =>
+    sections.flatMap((section) => {
+      const pager = section.querySelector('.pager')!.getBoundingClientRect()
+      const coins = [...section.querySelectorAll<HTMLElement>('.coin-cell:not(.add-tile)')].filter((c) => {
+        const r = c.getBoundingClientRect()
+        return r.left >= pager.left - 1 && r.right <= pager.right + 1 && r.bottom <= pager.bottom + 1
+      })
+      const rows = new Map<number, HTMLElement[]>()
+      for (const c of coins) {
+        const top = Math.round(c.getBoundingClientRect().top)
+        rows.set(top, [...(rows.get(top) ?? []), c])
+      }
+      return [...rows.values()].flatMap((row) =>
+        ['.orb', '.coin-name', '.coin-amount', '.coin-plan']
+          .map((part) => ({
+            part,
+            tops: [...new Set(row.map((c) => c.querySelector(part)?.getBoundingClientRect().top).filter((t) => t !== undefined).map(Math.round))],
+            names: row.map((c) => c.querySelector('.coin-name')!.textContent),
+          }))
+          .filter((p) => p.tops.length > 1)
+          .map((p) => `${p.part} at ${p.tops.join('/')}: ${p.names.join(', ')}`),
+      )
+    }),
+  )
+  expect(misaligned).toEqual([])
 })
