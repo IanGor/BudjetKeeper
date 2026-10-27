@@ -635,6 +635,8 @@ button.list-row:active { background: var(--surface-2); }
   background: var(--error); color: #fff;
 }
 .splash { height: 100%; display: grid; place-items: center; color: var(--muted); }
+.splash-failed { display: grid; gap: 14px; justify-items: center; padding: 0 24px; text-align: center; }
+.splash-failed p { margin: 0; }
 
 /* ------------------------------------------------------------ reduced motion:
    cross-fades instead of slides, no overshoot */

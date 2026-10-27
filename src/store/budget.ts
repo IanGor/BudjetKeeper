@@ -4,7 +4,7 @@ import { errorText, supabase } from '../lib/supabase'
 import { applyTransaction, monthStart, type Totals } from '../lib/totals'
 import type { Entity, EntityKind, Household, Member, Transaction } from '../lib/types'
 
-type Status = 'loading' | 'signedOut' | 'onboarding' | 'ready'
+type Status = 'loading' | 'failed' | 'signedOut' | 'onboarding' | 'ready'
 
 export interface EntityInput {
   kind: EntityKind
@@ -36,6 +36,10 @@ interface BudgetState {
   toast: string | null
 
   setSession(session: Session | null): Promise<void>
+  /** shows the retry screen instead of an endless splash; no-op once something else is on screen */
+  markFailed(): void
+  /** starts over from the stored session (the «Повторить» button) */
+  retry(): Promise<void>
   loadAll(): Promise<void>
   refreshTotals(): Promise<void>
   loadMembers(): Promise<void>
@@ -83,6 +87,21 @@ export const useBudget = create<BudgetState>((set, get) => {
     txVersion: 0,
     toast: null,
 
+    markFailed() {
+      if (get().status === 'loading') set({ status: 'failed' })
+    },
+
+    async retry() {
+      set({ status: 'loading' })
+      try {
+        const { data, error } = await supabase.auth.getSession()
+        if (error) throw error
+        await get().setSession(data.session)
+      } catch {
+        get().markFailed()
+      }
+    },
+
     async setSession(session) {
       if (!session) {
         set({ status: 'signedOut', userId: null, household: null, members: [], entities: {}, totals: {} })
@@ -97,44 +116,46 @@ export const useBudget = create<BudgetState>((set, get) => {
       const userId = get().userId
       if (!userId) return
       const month = monthStart()
-
-      const { data: me, error } = await supabase
-        .from('household_members')
-        .select('household_id')
-        .eq('user_id', userId)
-        .maybeSingle()
-      if (error) {
-        fail(error)
-        if (get().status === 'loading') set({ status: 'onboarding' })
-        return
-      }
-      if (!me) {
-        set({ status: 'onboarding', household: null })
-        return
-      }
-
-      const hid = me.household_id as string
-      const [h, members, entities, totals] = await Promise.all([
-        supabase.from('households').select('id, name, invite_code, max_members, roundup_account_id').eq('id', hid).single(),
-        supabase.from('household_members').select('household_id, user_id, display_name').eq('household_id', hid),
-        supabase.from('entities').select('*').eq('household_id', hid).order('position'),
-        supabase.rpc('entity_totals', { p_month: month }),
-      ])
-      const err = h.error ?? members.error ?? entities.error ?? totals.error
-      if (err) {
+      // while the first load has not finished, a failure must leave the splash, not hang on it
+      const giveUp = (err: unknown) => {
         fail(err)
-        return
+        get().markFailed()
       }
 
-      set({
-        status: 'ready',
-        month,
-        household: h.data as Household,
-        members: members.data as Member[],
-        entities: Object.fromEntries((entities.data as Entity[]).map((e) => [e.id, e])),
-        totals: toTotals(totals.data),
-        txVersion: get().txVersion + 1,
-      })
+      try {
+        const { data: me, error } = await supabase
+          .from('household_members')
+          .select('household_id')
+          .eq('user_id', userId)
+          .maybeSingle()
+        if (error) return giveUp(error)
+        if (!me) {
+          set({ status: 'onboarding', household: null })
+          return
+        }
+
+        const hid = me.household_id as string
+        const [h, members, entities, totals] = await Promise.all([
+          supabase.from('households').select('id, name, invite_code, max_members, roundup_account_id').eq('id', hid).single(),
+          supabase.from('household_members').select('household_id, user_id, display_name').eq('household_id', hid),
+          supabase.from('entities').select('*').eq('household_id', hid).order('position'),
+          supabase.rpc('entity_totals', { p_month: month }),
+        ])
+        const err = h.error ?? members.error ?? entities.error ?? totals.error
+        if (err) return giveUp(err)
+
+        set({
+          status: 'ready',
+          month,
+          household: h.data as Household,
+          members: members.data as Member[],
+          entities: Object.fromEntries((entities.data as Entity[]).map((e) => [e.id, e])),
+          totals: toTotals(totals.data),
+          txVersion: get().txVersion + 1,
+        })
+      } catch (err) {
+        giveUp(err)
+      }
     },
 
     async refreshTotals() {

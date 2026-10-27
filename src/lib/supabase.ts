@@ -5,8 +5,23 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
 export const supabaseConfigured = Boolean(url && anonKey)
 
+const REQUEST_TIMEOUT_MS = 15000
+
+/** A request that never answers (bad network, throttled host) must fail, not hang the app. */
+const fetchWithTimeout: typeof fetch = (input, init) => {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const caller = init?.signal
+  if (caller) {
+    if (caller.aborted) controller.abort()
+    else caller.addEventListener('abort', () => controller.abort(), { once: true })
+  }
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
 export const supabase = createClient(url ?? 'http://localhost:54321', anonKey ?? 'missing-key', {
   auth: { persistSession: true, autoRefreshToken: true },
+  global: { fetch: fetchWithTimeout },
 })
 
 /** Human-readable message for Supabase/PostgREST errors raised by our SQL. */
