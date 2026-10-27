@@ -165,16 +165,84 @@ test('a spending is rounded up to 10 ₽, the difference goes to the round-up ac
   await expect.poll(() => read('Подушка')).toBe(before.roundup + 7)
 })
 
-test('round-up settings live in the general settings', async ({ board: page }) => {
+test('round-up settings are a screen of their own inside the settings', async ({ board: page }) => {
   await page.getByRole('button', { name: 'Настройки', exact: true }).click()
   const sheet = page.getByRole('dialog')
-  const target = sheet.getByLabel('Счёт для округлений')
-  await expect(target).toHaveValue(/.+/)
+  // the settings list shows only a summary line
+  const row = sheet.getByRole('button', { name: /Округление/ })
+  await expect(row).toContainText('до 10 ₽')
+  await expect(sheet.getByLabel('Разница приходит на счёт')).toHaveCount(0)
+
+  await row.click()
+  await expect(sheet.getByRole('heading', { name: 'Округление' })).toBeVisible()
+  await sheetIsClean(page)
   await expect(sheet.getByRole('radio', { name: 'до 10 ₽' })).toBeChecked()
 
-  // an account added to «Не округлять траты со счетов» shows up in the list and can be removed
-  await sheet.getByLabel('Не округлять траты со счетов: добавить счёт').selectOption({ label: 'Бэйбик' })
+  // an account added to the exceptions shows up in the list and can be removed
+  await sheet.getByLabel('Не округлять траты со счетов: добавить').selectOption({ label: 'Бэйбик' })
   await expect(sheet.locator('.list-row', { hasText: 'Бэйбик' })).toHaveCount(1)
   await sheet.getByRole('button', { name: 'Убрать «Бэйбик»' }).click()
   await expect(sheet.locator('.list-row', { hasText: 'Бэйбик' })).toHaveCount(0)
+
+  await sheet.getByRole('button', { name: 'Назад к настройкам' }).click()
+  await expect(sheet.getByRole('heading', { name: 'Настройки' })).toBeVisible()
+})
+
+test('a category left out of rounding, transfers and income are never rounded', async ({ board: page }) => {
+  const sheet = page.getByRole('dialog')
+  const type = async (keys: string[]) => {
+    for (const k of keys) await sheet.getByRole('button', { name: k, exact: true }).click()
+  }
+
+  // transfer between accounts: no round-up line (income is covered by the rules unit test)
+  await dragCoin(page, 'Этот месяц', 'Бэйбик')
+  await type(['1', '3'])
+  await expect(sheet.locator('.delta.roundup')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+
+  // spending on a category from the exceptions
+  await page.getByRole('button', { name: 'Настройки', exact: true }).click()
+  await sheet.getByRole('button', { name: /Округление/ }).click()
+  await sheet.getByLabel('Не округлять траты на категории: добавить').selectOption({ label: 'Еда в городе' })
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+  await dragCoin(page, 'Этот месяц', 'Еда в городе')
+  await type(['1', '3'])
+  await expect(sheet.locator('.delta.roundup')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+
+  // restore the shared budget
+  await page.getByRole('button', { name: 'Настройки', exact: true }).click()
+  await sheet.getByRole('button', { name: /Округление/ }).click()
+  await sheet.getByRole('button', { name: 'Убрать «Еда в городе»' }).click()
+  await expect(sheet.locator('.list-row', { hasText: 'Еда в городе' })).toHaveCount(0)
+})
+
+test('the feed lists all operations by day, newest first, with the time and the round-up', async ({ board: page }) => {
+  // a spending with a round-up, so the feed has one to show
+  await dragCoin(page, 'Этот месяц', 'Еда в городе')
+  const sheet = page.getByRole('dialog')
+  for (const k of ['1', '4', '3', '3']) await sheet.getByRole('button', { name: k, exact: true }).click()
+  await sheet.getByRole('button', { name: 'Готово' }).click()
+  await expect(sheet).toBeHidden()
+
+  await page.getByRole('button', { name: 'Все операции' }).click()
+  const feed = page.getByRole('dialog', { name: 'Все операции' })
+  await expect(feed.locator('.feed-day h3').first()).toContainText('Сегодня')
+  const first = feed.locator('.feed-row').first()
+  await expect(first.locator('.feed-time')).toHaveText(/^\d{2}:\d{2}$/)
+  await expect(first.locator('.feed-flow')).toContainText('Этот месяц → Еда в городе')
+  await expect(first.locator('.feed-amt')).toHaveText(/−1\s433/)
+  await expect(first.locator('.feed-round')).toContainText(/Округление \+7\s₽ → Подушка/)
+  // a round-up is not a row of its own
+  await expect(feed.locator('.feed-row', { hasText: 'Этот месяц → Подушка' })).toHaveCount(0)
+  expect(await viewportOverflow(page)).toBeLessThanOrEqual(0)
+
+  // days go from the latest back
+  const days = await feed.locator('.feed-day h3').allTextContents()
+  expect(days.length).toBeGreaterThan(0)
+  await feed.getByRole('button', { name: 'Закрыть ленту' }).click()
+  await expect(feed).toBeHidden()
 })

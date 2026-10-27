@@ -40,9 +40,11 @@ export interface Household {
   roundup_step: number
   /** accounts whose outgoing operations are not rounded */
   roundup_skip_from: string[]
+  /** categories whose spending is not rounded */
+  roundup_skip_to: string[]
 }
 
-export type RoundupSettings = Pick<Household, 'roundup_account_id' | 'roundup_step' | 'roundup_skip_from'>
+export type RoundupSettings = Pick<Household, 'roundup_account_id' | 'roundup_step' | 'roundup_skip_from' | 'roundup_skip_to'>
 
 export interface Member {
   household_id: string

@@ -62,6 +62,11 @@ interface BudgetState {
   updateTransaction(old: Transaction, patch: Partial<TransactionInput>): Promise<boolean>
   deleteTransaction(tx: Transaction): Promise<boolean>
   fetchTransactions(entityId: string): Promise<Transaction[]>
+  /**
+   * A page of the feed of all operations, newest first. Round-ups are not rows of their
+   * own: each comes back under the spending it belongs to (`roundups[spending.id]`).
+   */
+  fetchFeed(offset: number, limit: number): Promise<{ rows: Transaction[]; roundups: Record<string, Transaction> } | null>
 
   upsertEntityLocal(entity: Entity): void
   removeEntityLocal(id: string): void
@@ -139,7 +144,7 @@ export const useBudget = create<BudgetState>((set, get) => {
 
         const hid = me.household_id as string
         const [h, members, entities, totals] = await Promise.all([
-          supabase.from('households').select('id, name, invite_code, max_members, roundup_account_id, roundup_step, roundup_skip_from').eq('id', hid).single(),
+          supabase.from('households').select('id, name, invite_code, max_members, roundup_account_id, roundup_step, roundup_skip_from, roundup_skip_to').eq('id', hid).single(),
           supabase.from('household_members').select('household_id, user_id, display_name').eq('household_id', hid),
           supabase.from('entities').select('*').eq('household_id', hid).order('position'),
           supabase.rpc('entity_totals', { p_month: month }),
@@ -323,6 +328,34 @@ export const useBudget = create<BudgetState>((set, get) => {
         return []
       }
       return data as Transaction[]
+    },
+
+    async fetchFeed(offset, limit) {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select(TX_COLUMNS)
+        .is('roundup_of', null)
+        .order('occurred_at', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+      if (error) {
+        fail(error)
+        return null
+      }
+      const rows = data as Transaction[]
+      const roundups: Record<string, Transaction> = {}
+      if (rows.length > 0) {
+        const { data: linked, error: linkError } = await supabase
+          .from('transactions')
+          .select(TX_COLUMNS)
+          .in('roundup_of', rows.map((r) => r.id))
+        if (linkError) {
+          fail(linkError)
+          return null
+        }
+        for (const r of linked as Transaction[]) if (r.roundup_of) roundups[r.roundup_of] = r
+      }
+      return { rows, roundups }
     },
 
     upsertEntityLocal(entity) {

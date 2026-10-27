@@ -193,9 +193,9 @@ describe.skipIf(!url || !key || !serviceKey)('database', () => {
     expect((await set(alice, null)).error).toBeNull()
     // the step and the exception list are theirs too, within sane bounds
     const rule = (patch: Record<string, unknown>) => alice.from('households').update(patch).eq('id', hid)
-    expect((await rule({ roundup_step: 5000, roundup_skip_from: [ids['Карта']] })).error).toBeNull()
+    expect((await rule({ roundup_step: 5000, roundup_skip_from: [ids['Карта']], roundup_skip_to: [ids['Кафе']] })).error).toBeNull()
     expect((await rule({ roundup_step: 0 })).error).not.toBeNull()
-    expect((await rule({ roundup_step: 1000, roundup_skip_from: [] })).error).toBeNull()
+    expect((await rule({ roundup_step: 1000, roundup_skip_from: [], roundup_skip_to: [] })).error).toBeNull()
     // only the name and the round-up settings are the members' to change
     expect((await alice.from('households').update({ max_members: 5 }).eq('id', hid)).error?.message).toMatch(/permission denied/)
     expect((await alice.from('households').update({ name: 'Семья' }).eq('id', hid)).error).toBeNull()

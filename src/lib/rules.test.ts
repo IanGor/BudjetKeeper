@@ -66,19 +66,26 @@ describe('roundUpExtra', () => {
 
 describe('roundupApplies', () => {
   const e = (id: string, kind: EntityKind) => ({ id, kind }) as Entity
-  const base: RoundupSettings = { roundup_account_id: 'save', roundup_step: 1000, roundup_skip_from: [] }
+  const base: RoundupSettings = { roundup_account_id: 'save', roundup_step: 1000, roundup_skip_from: [], roundup_skip_to: [] }
   const card = e('card', 'account')
+  const food = e('food', 'expense')
 
-  it('rounds only spending from an account to a category', () => {
-    expect(roundupApplies(base, card, e('food', 'expense'))).toBe(true)
-    expect(roundupApplies(base, card, e('cash', 'account'))).toBe(false)
-    expect(roundupApplies(base, e('job', 'income'), card)).toBe(false)
+  it('rounds only spending from an account to a category, for every pair of kinds', () => {
+    const made = kinds.flatMap((f) => kinds.filter((t) => roundupApplies(base, e('a', f), e('b', t))).map((t) => `${f}→${t}`))
+    expect(made).toEqual(['account→expense'])
   })
   it('is off without a round-up account and for the round-up account itself', () => {
-    expect(roundupApplies({ ...base, roundup_account_id: null }, card, e('food', 'expense'))).toBe(false)
-    expect(roundupApplies(base, e('save', 'account'), e('food', 'expense'))).toBe(false)
+    expect(roundupApplies({ ...base, roundup_account_id: null }, card, food)).toBe(false)
+    expect(roundupApplies(base, e('save', 'account'), food)).toBe(false)
   })
   it('skips listed source accounts', () => {
-    expect(roundupApplies({ ...base, roundup_skip_from: ['card'] }, card, e('food', 'expense'))).toBe(false)
+    const s = { ...base, roundup_skip_from: ['card'] }
+    expect(roundupApplies(s, card, food)).toBe(false)
+    expect(roundupApplies(s, e('cash', 'account'), food)).toBe(true)
+  })
+  it('skips listed categories', () => {
+    const s = { ...base, roundup_skip_to: ['rent'] }
+    expect(roundupApplies(s, card, e('rent', 'expense'))).toBe(false)
+    expect(roundupApplies(s, card, food)).toBe(true)
   })
 })

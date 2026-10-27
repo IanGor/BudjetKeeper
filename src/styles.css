@@ -500,6 +500,18 @@ input, textarea { font: inherit; color: inherit; }
 .error { color: var(--error); font-size: 13px; margin: 6px 0 0; }
 .hint { color: var(--muted); font-size: 13px; text-align: center; margin: 10px 0 0; line-height: 1.45; }
 .link { color: var(--accent); font-weight: 500; }
+.hint.left { text-align: left; margin-top: 8px; }
+.list-row.muted { color: var(--muted); font-size: 14px; min-height: 44px; }
+.list-row .chev { flex: none; color: var(--faint); }
+/* round icon button: back arrow in a sheet header, remove cross in a list row */
+.icon-btn {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--accent);
+  transition: background-color 0.15s, transform 0.12s var(--ease-out);
+}
+.icon-btn:active { background: var(--surface-2); transform: scale(0.94); }
+.icon-btn.back { background: var(--surface-2); }
+.list-row .icon-btn { color: var(--muted); margin-right: -8px; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -700,3 +712,32 @@ button.list-row:active { background: var(--surface-2); }
 @media (min-width: 632px) {
   :root { --cols: 6; }
 }
+
+/* feed of all operations: a full-screen page under the sheets (z-index 50) */
+.feed {
+  position: fixed; inset: 0; z-index: 40; background: var(--bg);
+  display: flex; flex-direction: column;
+  max-width: 1000px; margin: 0 auto;
+  padding-top: var(--safe-top);
+}
+.feed-head { display: flex; align-items: center; gap: 12px; padding: 8px var(--gutter); }
+.feed-head h2 { margin: 0; font-size: var(--t2); font-weight: 700; letter-spacing: -0.01em; }
+.feed-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 var(--gutter) calc(var(--safe-bottom) + 24px); }
+.feed-day h3 {
+  position: sticky; top: 0; z-index: 1; margin: 0; padding: 14px 0 6px;
+  background: var(--bg); color: var(--section);
+  font-size: 14px; font-weight: 600; text-transform: capitalize;
+}
+.feed-row {
+  display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: baseline;
+  width: 100%; padding: 10px 0; text-align: left; border-bottom: 1px solid var(--hairline);
+}
+.feed-row:active { background: var(--surface-2); }
+.feed-time { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); }
+.feed-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.feed-flow { font-size: 15px; overflow-wrap: anywhere; }
+.feed-note, .feed-round { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.feed-round { color: var(--section); }
+.feed-amt { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.feed-amt.in { color: var(--success); }
+.feed-more { color: var(--muted); text-align: center; padding: 16px 0; font-size: 13px; }

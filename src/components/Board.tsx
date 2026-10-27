@@ -1,4 +1,4 @@
-import { ChevronDown, Settings2, X } from 'lucide-react'
+import { ChevronDown, ListOrdered, Settings2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { orderedKind, stopEditing, useArrange } from '../hooks/useArrange'
 import { useDrag } from '../hooks/useCoinDrag'
@@ -11,6 +11,7 @@ import { useBudget } from '../store/budget'
 import { AmountSheet } from './AmountSheet'
 import { AddTile, Coin, DragGhost } from './Coin'
 import { EntityEditor, EntitySheet } from './EntitySheet'
+import { Feed } from './Feed'
 import { MonthIcon } from './MonthIcon'
 import { PlanBar } from './PlanBar'
 import { Settings } from './Settings'
@@ -57,6 +58,7 @@ export function Board() {
   const [openedId, setOpenedId] = useState<string | null>(null)
   const [creating, setCreating] = useState<EntityKind | null>(null)
   const [settings, setSettings] = useState(false)
+  const [feed, setFeed] = useState(false)
   const [incomeOpen, setIncomeOpen] = useState(() => readFlag(INCOME_OPEN_KEY))
 
   const incomes = useMemo(() => orderedKind(entities, 'income', draft), [entities, draft])
@@ -134,9 +136,14 @@ export function Board() {
             Готово
           </button>
         ) : (
-          <button type="button" className="circle-btn" onClick={() => setSettings(true)} aria-label="Настройки">
-            <Settings2 size={18} strokeWidth={2} />
-          </button>
+          <>
+            <button type="button" className="circle-btn" onClick={() => setFeed(true)} aria-label="Все операции">
+              <ListOrdered size={18} strokeWidth={2} />
+            </button>
+            <button type="button" className="circle-btn" onClick={() => setSettings(true)} aria-label="Настройки">
+              <Settings2 size={18} strokeWidth={2} />
+            </button>
+          </>
         )}
       </header>
 
@@ -172,6 +179,7 @@ export function Board() {
       {flow && <AmountSheet from={flow.from} to={flow.to} onClose={() => setFlow(null)} />}
       {opened && <EntitySheet entity={opened} onClose={() => setOpenedId(null)} />}
       {creating && <EntityEditor kind={creating} onClose={() => setCreating(null)} />}
+      {feed && <Feed onClose={() => setFeed(false)} />}
       {settings && <Settings onClose={() => setSettings(false)} />}
     </div>
   )
