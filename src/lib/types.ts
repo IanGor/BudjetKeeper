@@ -23,6 +23,8 @@ export interface Transaction {
   amount_kopecks: number
   comment: string | null
   occurred_at: string // YYYY-MM-DD
+  /** the spending this round-up came from; it is deleted together with it */
+  roundup_of: string | null
   created_by: string | null
   created_at: string
 }
@@ -34,7 +36,13 @@ export interface Household {
   max_members: number
   /** account that collects round-ups of spending; null = no round-ups */
   roundup_account_id: string | null
+  /** rounding step, kopecks */
+  roundup_step: number
+  /** accounts whose outgoing operations are not rounded */
+  roundup_skip_from: string[]
 }
+
+export type RoundupSettings = Pick<Household, 'roundup_account_id' | 'roundup_step' | 'roundup_skip_from'>
 
 export interface Member {
   household_id: string

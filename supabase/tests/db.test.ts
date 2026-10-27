@@ -191,9 +191,26 @@ describe.skipIf(!url || !key || !serviceKey)('database', () => {
     const foreign = Object.values(await entityIds(eve))[0]
     expect((await set(alice, foreign)).error).not.toBeNull()
     expect((await set(alice, null)).error).toBeNull()
-    // only the name and the round-up account are the members' to change
+    // the step and the exception list are theirs too, within sane bounds
+    const rule = (patch: Record<string, unknown>) => alice.from('households').update(patch).eq('id', hid)
+    expect((await rule({ roundup_step: 5000, roundup_skip_from: [ids['Карта']] })).error).toBeNull()
+    expect((await rule({ roundup_step: 0 })).error).not.toBeNull()
+    expect((await rule({ roundup_step: 1000, roundup_skip_from: [] })).error).toBeNull()
+    // only the name and the round-up settings are the members' to change
     expect((await alice.from('households').update({ max_members: 5 }).eq('id', hid)).error?.message).toMatch(/permission denied/)
     expect((await alice.from('households').update({ name: 'Семья' }).eq('id', hid)).error).toBeNull()
+  })
+
+  it('deleting a spending deletes its round-up', async () => {
+    const parent = crypto.randomUUID()
+    const rows = [
+      { id: parent, ...tx('Карта', 'Кафе', 1433) },
+      { id: crypto.randomUUID(), ...tx('Карта', 'Наличные', 7), comment: 'Округление', roundup_of: parent },
+    ]
+    expect((await alice.from('transactions').insert(rows)).error).toBeNull()
+    expect((await alice.from('transactions').delete().eq('id', parent)).error).toBeNull()
+    const { data } = await alice.from('transactions').select('id').or(`id.eq.${parent},roundup_of.eq.${parent}`)
+    expect(data).toEqual([])
   })
 
   it('does not let anyone sign up', async () => {

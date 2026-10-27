@@ -66,6 +66,30 @@ test('edit a transaction from the history', async ({ board: page }) => {
   await expect(sheet.getByRole('button', { name: 'Удалить операцию' })).toBeVisible()
 })
 
+test('a transaction can be moved to another account', async ({ board: page }) => {
+  const openFirst = async () => {
+    await page.locator('[data-entity-id]', { hasText: 'Аренда' }).click()
+    const sheet = page.getByRole('dialog')
+    await sheet.locator('.list-row').first().click()
+    return sheet
+  }
+  const sheet = await openFirst()
+  const from = sheet.getByLabel('Откуда', { exact: true })
+  const original = await from.inputValue()
+  const other = (await from.locator('option').evaluateAll((o) => o.map((x) => (x as HTMLOptionElement).value))).find((v) => v !== original)!
+  await expect(sheet.getByLabel('Куда', { exact: true })).toHaveValue(await sheet.locator('select').nth(1).inputValue())
+  await from.selectOption(other)
+  await sheet.getByRole('button', { name: 'Готово' }).click()
+  await expect(sheet.getByLabel('Откуда', { exact: true })).toBeHidden()
+
+  // saving returns to the category's history; open the same operation again
+  await sheet.locator('.list-row').first().click()
+  await expect(sheet.getByLabel('Откуда', { exact: true })).toHaveValue(other)
+  await sheet.getByLabel('Откуда', { exact: true }).selectOption(original)
+  await sheet.getByRole('button', { name: 'Готово' }).click()
+  await expect(sheet.getByLabel('Откуда', { exact: true })).toBeHidden()
+})
+
 test('account balance adjustment sheet', async ({ board: page }) => {
   await page.locator('[data-entity-id]', { hasText: 'Этот месяц' }).click()
   await page.getByRole('button', { name: 'Изменить баланс' }).click()
@@ -141,26 +165,16 @@ test('a spending is rounded up to 10 ₽, the difference goes to the round-up ac
   await expect.poll(() => read('Подушка')).toBe(before.roundup + 7)
 })
 
-test('round-ups can be moved to another account in its settings', async ({ board: page }) => {
-  const open = async (name: string) => {
-    await page.locator('[data-entity-id]', { hasText: name }).first().click()
-    const sheet = page.getByRole('dialog')
-    await sheet.getByRole('button', { name: 'Настройки' }).click()
-    return sheet
-  }
-  let sheet = await open('Бэйбик')
-  const sw = sheet.getByRole('switch', { name: /Копилка округлений/ })
-  await expect(sw).not.toBeChecked()
-  await sw.check()
-  await sheet.getByRole('button', { name: 'Сохранить' }).click()
-  await expect(sheet).toBeHidden()
+test('round-up settings live in the general settings', async ({ board: page }) => {
+  await page.getByRole('button', { name: 'Настройки', exact: true }).click()
+  const sheet = page.getByRole('dialog')
+  const target = sheet.getByLabel('Счёт для округлений')
+  await expect(target).toHaveValue(/.+/)
+  await expect(sheet.getByRole('radio', { name: 'до 10 ₽' })).toBeChecked()
 
-  // only one account collects them: «Подушка» lost it; give it back for the other devices
-  sheet = await open('Подушка')
-  await expect(sheet.getByRole('switch', { name: /Копилка округлений/ })).not.toBeChecked()
-  await sheet.getByRole('switch', { name: /Копилка округлений/ }).check()
-  await sheet.getByRole('button', { name: 'Сохранить' }).click()
-  await expect(sheet).toBeHidden()
-  sheet = await open('Бэйбик')
-  await expect(sheet.getByRole('switch', { name: /Копилка округлений/ })).not.toBeChecked()
+  // an account added to «Не округлять траты со счетов» shows up in the list and can be removed
+  await sheet.getByLabel('Не округлять траты со счетов: добавить счёт').selectOption({ label: 'Бэйбик' })
+  await expect(sheet.locator('.list-row', { hasText: 'Бэйбик' })).toHaveCount(1)
+  await sheet.getByRole('button', { name: 'Убрать «Бэйбик»' }).click()
+  await expect(sheet.locator('.list-row', { hasText: 'Бэйбик' })).toHaveCount(0)
 })

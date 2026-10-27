@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { Session } from '@supabase/supabase-js'
 import { errorText, supabase } from '../lib/supabase'
 import { applyTransaction, monthStart, type Totals } from '../lib/totals'
-import type { Entity, EntityKind, Household, Member, Transaction } from '../lib/types'
+import type { Entity, EntityKind, Household, Member, RoundupSettings, Transaction } from '../lib/types'
 
 type Status = 'loading' | 'failed' | 'signedOut' | 'onboarding' | 'ready'
 
@@ -16,6 +16,9 @@ export interface EntityInput {
 }
 
 export interface TransactionInput {
+  /** set when a round-up has to point to this operation in the same request */
+  id?: string
+  roundup_of?: string
   from_id: string | null
   to_id: string | null
   amount_kopecks: number
@@ -54,8 +57,8 @@ interface BudgetState {
   addTransaction(input: TransactionInput): Promise<boolean>
   /** several operations in one request: all are saved or none */
   addTransactions(inputs: TransactionInput[]): Promise<boolean>
-  /** the account that collects round-ups, or null to stop them */
-  setRoundupAccount(id: string | null): Promise<boolean>
+  /** saves round-up settings: the collecting account (null stops them), the step, the exceptions */
+  setRoundup(patch: Partial<RoundupSettings>): Promise<boolean>
   updateTransaction(old: Transaction, patch: Partial<TransactionInput>): Promise<boolean>
   deleteTransaction(tx: Transaction): Promise<boolean>
   fetchTransactions(entityId: string): Promise<Transaction[]>
@@ -65,7 +68,7 @@ interface BudgetState {
   bumpTx(): void
 }
 
-const TX_COLUMNS = 'id, household_id, from_id, to_id, amount_kopecks, comment, occurred_at, created_by, created_at'
+const TX_COLUMNS = 'id, household_id, from_id, to_id, amount_kopecks, comment, occurred_at, roundup_of, created_by, created_at'
 
 let refreshing: Promise<void> | null = null
 let refreshAgain = false
@@ -136,7 +139,7 @@ export const useBudget = create<BudgetState>((set, get) => {
 
         const hid = me.household_id as string
         const [h, members, entities, totals] = await Promise.all([
-          supabase.from('households').select('id, name, invite_code, max_members, roundup_account_id').eq('id', hid).single(),
+          supabase.from('households').select('id, name, invite_code, max_members, roundup_account_id, roundup_step, roundup_skip_from').eq('id', hid).single(),
           supabase.from('household_members').select('household_id, user_id, display_name').eq('household_id', hid),
           supabase.from('entities').select('*').eq('household_id', hid).order('position'),
           supabase.rpc('entity_totals', { p_month: month }),
@@ -250,7 +253,7 @@ export const useBudget = create<BudgetState>((set, get) => {
       const apply = (sign: 1 | -1) =>
         set({ totals: inputs.reduce((t, input) => applyTransaction(t, get().entities, input, month, sign), get().totals) })
       apply(1)
-      const { error } = await supabase.from('transactions').insert(inputs.map((input) => ({ ...input, household_id: household.id })))
+      const { error } = await supabase.from('transactions').insert(inputs.map((input) => ({ ...input, id: input.id ?? crypto.randomUUID(), household_id: household.id })))
       if (error) {
         apply(-1)
         return fail(error)
@@ -260,11 +263,11 @@ export const useBudget = create<BudgetState>((set, get) => {
       return true
     },
 
-    async setRoundupAccount(id) {
+    async setRoundup(patch) {
       const household = get().household
       if (!household) return false
-      set({ household: { ...household, roundup_account_id: id } })
-      const { error } = await supabase.from('households').update({ roundup_account_id: id }).eq('id', household.id)
+      set({ household: { ...household, ...patch } })
+      const { error } = await supabase.from('households').update(patch).eq('id', household.id)
       if (error) {
         set({ household })
         return fail(error)
@@ -289,11 +292,17 @@ export const useBudget = create<BudgetState>((set, get) => {
     },
 
     async deleteTransaction(tx) {
-      const { entities, month } = get()
-      set({ totals: applyTransaction(get().totals, entities, tx, month, -1) })
+      const { month } = get()
+      // the round-up of a spending goes with it (the database deletes it by the link)
+      const { data: linked, error: linkError } = await supabase.from('transactions').select(TX_COLUMNS).eq('roundup_of', tx.id)
+      if (linkError) return fail(linkError)
+      const gone = [tx, ...((linked ?? []) as Transaction[])]
+      const apply = (sign: 1 | -1) =>
+        set({ totals: gone.reduce((t, x) => applyTransaction(t, get().entities, x, month, sign), get().totals) })
+      apply(-1)
       const { error } = await supabase.from('transactions').delete().eq('id', tx.id)
       if (error) {
-        set({ totals: applyTransaction(get().totals, get().entities, tx, month) })
+        apply(1)
         return fail(error)
       }
       get().bumpTx()

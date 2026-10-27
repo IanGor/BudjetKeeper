@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { canDragFrom, canFlow, flowLabel, planFill, roundUpExtra } from './rules'
-import type { EntityKind } from './types'
+import { canDragFrom, canFlow, flowLabel, planFill, roundupApplies, roundUpExtra } from './rules'
+import type { Entity, EntityKind, RoundupSettings } from './types'
 
 const kinds: EntityKind[] = ['income', 'account', 'expense']
 
@@ -61,5 +61,24 @@ describe('roundUpExtra', () => {
   })
   it('adds nothing to nothing', () => {
     expect(roundUpExtra(0)).toBe(0)
+  })
+})
+
+describe('roundupApplies', () => {
+  const e = (id: string, kind: EntityKind) => ({ id, kind }) as Entity
+  const base: RoundupSettings = { roundup_account_id: 'save', roundup_step: 1000, roundup_skip_from: [] }
+  const card = e('card', 'account')
+
+  it('rounds only spending from an account to a category', () => {
+    expect(roundupApplies(base, card, e('food', 'expense'))).toBe(true)
+    expect(roundupApplies(base, card, e('cash', 'account'))).toBe(false)
+    expect(roundupApplies(base, e('job', 'income'), card)).toBe(false)
+  })
+  it('is off without a round-up account and for the round-up account itself', () => {
+    expect(roundupApplies({ ...base, roundup_account_id: null }, card, e('food', 'expense'))).toBe(false)
+    expect(roundupApplies(base, e('save', 'account'), e('food', 'expense'))).toBe(false)
+  })
+  it('skips listed source accounts', () => {
+    expect(roundupApplies({ ...base, roundup_skip_from: ['card'] }, card, e('food', 'expense'))).toBe(false)
   })
 })

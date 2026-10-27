@@ -4,7 +4,7 @@ import { useOnline } from '../hooks/useOnline'
 import { hasOperator, kopecksToInput, pressKey, type Key } from '../lib/keypad'
 import { evalExpression, formatRub, MAX_KOPECKS } from '../lib/money'
 import { celebrateDrop } from '../lib/celebrate'
-import { flowLabel, roundUpExtra } from '../lib/rules'
+import { canFlow, flowLabel, roundupApplies, roundUpExtra } from '../lib/rules'
 import { adjustmentFor, todayISO } from '../lib/totals'
 import type { Entity, Transaction } from '../lib/types'
 import { useBudget } from '../store/budget'
@@ -27,38 +27,69 @@ const KEYBOARD: Record<string, Key> = { '.': '.', ',': '.', '+': '+', '-': '−'
 const ADJUSTMENT = 'Корректировка'
 const ROUNDUP = 'Округление'
 
-export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
+function SidePicker({ label, value, options, onChange }: { label: string; value: string; options: Entity[]; onChange(id: string): void }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <select className="input" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((e) => (
+          <option key={e.id} value={e.id}>
+            {e.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }: Props) {
   const [expr, setExpr] = useState(tx ? kopecksToInput(tx.amount_kopecks) : '')
   const [date, setDate] = useState(tx?.occurred_at ?? todayISO())
   const [comment, setComment] = useState(tx?.comment ?? '')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // an existing operation can be moved to other accounts / categories
+  const [fromId, setFromId] = useState(fromProp?.id ?? null)
+  const [toId, setToId] = useState(toProp?.id ?? null)
+  const entities = useBudget((s) => s.entities)
+  const from = (fromId && entities[fromId]) || null
+  const to = (toId && entities[toId]) || null
   // rounding up is on whenever the round-up account allows it; this switches it off once
   const [noRoundup, setNoRoundup] = useState(false)
   const online = useOnline()
   const addTransaction = useBudget((s) => s.addTransaction)
   const addTransactions = useBudget((s) => s.addTransactions)
-  const roundupId = useBudget((s) => s.household?.roundup_account_id)
-  const roundupAccount = useBudget((s) => (roundupId ? s.entities[roundupId] : undefined))
+  const household = useBudget((s) => s.household)
+  const roundupAccount = useBudget((s) => (s.household?.roundup_account_id ? s.entities[s.household.roundup_account_id] : undefined))
   const updateTransaction = useBudget((s) => s.updateTransaction)
   const deleteTransaction = useBudget((s) => s.deleteTransaction)
 
   const amount = evalExpression(expr)
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date)
   const delta = balance && amount !== null ? amount - balance.current : 0
-  const valid = dateOk && amount !== null && amount <= MAX_KOPECKS && (balance ? delta !== 0 : amount > 0)
+  const moved = fromId !== (fromProp?.id ?? null) || toId !== (toProp?.id ?? null)
+  const valid =
+    dateOk && amount !== null && amount <= MAX_KOPECKS && (balance ? delta !== 0 : amount > 0) && (fromId === null || fromId !== toId)
 
-  // a new spending from an account is rounded up to 10 ₽: the category gets the
-  // real price, the difference goes to the round-up account (not from itself)
+  // a new spending or transfer from an account is rounded up to the step of the
+  // settings: the target gets the real sum, the difference goes to the round-up account
   const roundup =
-    !tx && !balance && from?.kind === 'account' && to?.kind === 'expense' && roundupAccount && !roundupAccount.archived && roundupAccount.id !== from.id
+    !tx && !balance && household && from && to && roundupAccount && !roundupAccount.archived && roundupApplies(household, from, to)
       ? roundupAccount
       : null
-  const roundable = roundup && amount !== null ? roundUpExtra(amount) : 0
+  const roundable = roundup && amount !== null ? roundUpExtra(amount, household!.roundup_step) : 0
   const extra = noRoundup ? 0 : roundable
 
   const isAdjustment = !balance && (from === null || to === null)
   const account = balance?.account ?? (isAdjustment ? (from ?? to) : null)
   const title = balance ? 'Баланс счёта' : isAdjustment ? ADJUSTMENT : flowLabel(from!.kind, to!.kind)
+
+  // entities an operation side can be switched to: those the flow rules allow next to the other side
+  const pick = (fromKind: Entity['kind'] | null, toKind: Entity['kind'] | null, only?: Entity['kind']) =>
+    Object.values(entities).filter(
+      (e) =>
+        (e.id === fromId || e.id === toId || !e.archived) &&
+        (only ? e.kind === only : fromKind ? canFlow(fromKind, e.kind) : toKind ? canFlow(e.kind, toKind) : true),
+    )
 
   // Totals are updated optimistically by the store, so the sheet closes at once;
   // a failed write is rolled back there and reported with a toast.
@@ -69,13 +100,14 @@ export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
       const adj = adjustmentFor(balance.account.id, balance.current, amount)
       if (adj) void addTransaction({ ...adj, occurred_at: date, comment: note ?? ADJUSTMENT })
     } else if (tx) {
-      void updateTransaction(tx, { amount_kopecks: amount, occurred_at: date, comment: note })
+      void updateTransaction(tx, { amount_kopecks: amount, occurred_at: date, comment: note, ...(moved && { from_id: fromId, to_id: toId }) })
     } else {
-      const spending = { from_id: from!.id, to_id: to!.id, amount_kopecks: amount, occurred_at: date, comment: note }
+      const id = crypto.randomUUID()
+      const spending = { id, from_id: from!.id, to_id: to!.id, amount_kopecks: amount, occurred_at: date, comment: note }
       if (to!.kind === 'expense') celebrateDrop(to!.id)
       void addTransactions(
         roundup && extra > 0
-          ? [spending, { from_id: from!.id, to_id: roundup.id, amount_kopecks: extra, occurred_at: date, comment: ROUNDUP }]
+          ? [spending, { from_id: from!.id, to_id: roundup.id, amount_kopecks: extra, occurred_at: date, comment: ROUNDUP, roundup_of: id }]
           : [spending],
       )
     }
@@ -113,7 +145,18 @@ export function AmountSheet({ from, to, tx, balance, onClose }: Props) {
 
   return (
     <Sheet title={title} subtitle={tx ? 'Изменение операции' : undefined} onClose={onClose}>
-      {account ? (
+      {tx && !balance ? (
+        <div className="inline">
+          {isAdjustment ? (
+            <SidePicker label="Счёт" value={(fromId ?? toId)!} options={pick(null, null, 'account')} onChange={fromId ? setFromId : setToId} />
+          ) : (
+            <>
+              <SidePicker label="Откуда" value={fromId!} options={pick(null, to!.kind)} onChange={setFromId} />
+              <SidePicker label="Куда" value={toId!} options={pick(from!.kind, null)} onChange={setToId} />
+            </>
+          )}
+        </div>
+      ) : account ? (
         <div className="flow">
           <div className="side">
             <Orb entity={account} />
