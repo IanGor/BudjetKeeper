@@ -5,6 +5,20 @@ import { loadEnv } from 'vite'
 
 export const USER = { email: 'e2e-igor@test.local', password: 'password123' }
 
+export async function restoreRoundup() {
+  const env = loadEnv('test', process.cwd(), '')
+  if (!env.VITE_SUPABASE_URL?.startsWith('http://127.0.0.1')) throw new Error('UI tests run only against the local Supabase stack')
+  const admin = createClient(env.VITE_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+  const { data, error } = await admin.auth.admin.listUsers()
+  if (error) throw error
+  const user = data.users.find((u) => u.email === USER.email)
+  if (!user) throw new Error('UI test user not found')
+  const member = await admin.from('household_members').select('household_id').eq('user_id', user.id).single()
+  if (member.error) throw member.error
+  const result = await admin.from('households').update({ roundup_enabled: true }).eq('id', member.data.household_id)
+  if (result.error) throw result.error
+}
+
 type Kind = 'income' | 'account' | 'expense'
 type Row = [kind: Kind, name: string, icon: string, color: string, plan?: number]
 

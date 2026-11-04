@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import { backgroundAlpha, clippedText, overlaps, textBoxes, viewportOverflow } from './layout'
+import { restoreRoundup } from './seed'
 
 async function sheetIsClean(page: Page) {
   const sheet = page.getByRole('dialog')
@@ -188,6 +189,8 @@ test('round-up settings are a screen of their own inside the settings', async ({
   await expect(sheet.getByRole('heading', { name: 'Настройки' })).toBeVisible()
 })
 
+test.describe('household round-up switch', () => {
+test.afterEach(async () => { await restoreRoundup() })
 test('the household switch hides rounding and preserves its settings', async ({ board: page }) => {
   const sheet = page.getByRole('dialog')
   await page.getByRole('button', { name: 'Настройки', exact: true }).click()
@@ -200,14 +203,17 @@ test('the household switch hides rounding and preserves its settings', async ({ 
   await sheet.getByRole('button', { name: 'Назад к настройкам' }).click()
   await expect(sheet.getByRole('button', { name: /Округление/ })).toContainText('Выключено')
   await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
   await dragCoin(page, 'Этот месяц', 'Еда в городе')
   for (const k of ['1', '5']) await sheet.getByRole('button', { name: k, exact: true }).click()
   await expect(sheet.locator('.delta.roundup')).toHaveCount(0)
   await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
   await page.getByRole('button', { name: 'Настройки', exact: true }).click()
   await sheet.getByRole('button', { name: /Округление/ }).click()
   await toggle.check()
   await expect(sheet.getByLabel('Разница приходит на счёт')).toHaveValue(account)
+})
 })
 
 test('a category left out of rounding, transfers and income are never rounded', async ({ board: page }) => {
