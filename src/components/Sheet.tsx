@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 
 interface SheetProps {
   title: ReactNode
@@ -7,6 +7,8 @@ interface SheetProps {
   /** shown left of the title (e.g. the entity's orb) */
   leading?: ReactNode
   onClose(): void
+  className?: string
+  dismissDisabled?: boolean
   children: ReactNode
 }
 
@@ -19,7 +21,8 @@ const rubberband = (over: number, size: number, c = 0.55) => (over * size * c) /
 
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-export function Sheet({ title, subtitle, leading, onClose, children }: SheetProps) {
+export function Sheet({ title, subtitle, leading, onClose, children, className = '', dismissDisabled = false }: SheetProps) {
+  const titleId = useId()
   const [closing, setClosing] = useState(false)
   const backdropRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -27,10 +30,50 @@ export function Sheet({ title, subtitle, leading, onClose, children }: SheetProp
 
   // exits along the path it came in (slides back down)
   const dismiss = useCallback(() => {
-    if (closing) return
+    if (closing || dismissDisabled) return
     setClosing(true)
     window.setTimeout(onClose, reducedMotion() ? 0 : CLOSE_MS)
-  }, [closing, onClose])
+  }, [closing, onClose, dismissDisabled])
+
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null
+    const background: { element: HTMLElement; inert: boolean }[] = []
+    let branch = backdropRef.current as HTMLElement
+    while (branch.parentElement) {
+      for (const sibling of branch.parentElement.children) {
+        if (sibling !== branch && sibling instanceof HTMLElement) {
+          background.push({ element: sibling, inert: sibling.inert })
+          sibling.inert = true
+        }
+      }
+      branch = branch.parentElement
+    }
+    const sheet = sheetRef.current!
+    const focusable = () => Array.from(sheet.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]'))
+      .filter((el) => !el.closest('fieldset:disabled') && el.getClientRects().length > 0)
+    const isTop = () => Array.from(document.querySelectorAll('[role="dialog"]')).at(-1) === sheet
+    if (!sheet.contains(document.activeElement)) (focusable()[0] ?? sheet).focus()
+    const containFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !isTop()) return
+      const fields = focusable()
+      const index = fields.indexOf(document.activeElement as HTMLElement)
+      if (!fields.length || index < 0 || (!event.shiftKey && index === fields.length - 1) || (event.shiftKey && index === 0)) {
+        event.preventDefault()
+        ;(event.shiftKey ? fields.at(-1) ?? sheet : fields[0] ?? sheet).focus()
+      }
+    }
+    const containProgrammaticFocus = () => {
+      if (isTop() && !sheet.contains(document.activeElement)) (focusable()[0] ?? sheet).focus()
+    }
+    document.addEventListener('focusin', containProgrammaticFocus)
+    document.addEventListener('keydown', containFocus)
+    return () => {
+      document.removeEventListener('keydown', containFocus)
+      document.removeEventListener('focusin', containProgrammaticFocus)
+      for (const { element, inert } of background) element.inert = inert
+      if (previous?.isConnected) previous.focus()
+    }
+  }, [])
 
   // On-screen keyboards cover the page instead of resizing it (Chrome on Android,
   // Safari): the browser then pans the whole page to the focused field and the sheet's
@@ -62,7 +105,7 @@ export function Sheet({ title, subtitle, leading, onClose, children }: SheetProp
   }, [dismiss])
 
   const onPointerDown = (e: ReactPointerEvent) => {
-    if ((e.target as Element).closest('button') || closing) return
+    if ((e.target as Element).closest('button') || closing || dismissDisabled) return
     e.currentTarget.setPointerCapture(e.pointerId)
     drag.current = { id: e.pointerId, startY: e.clientY, samples: [{ y: e.clientY, t: e.timeStamp }] }
     const sheet = sheetRef.current!
@@ -112,9 +155,11 @@ export function Sheet({ title, subtitle, leading, onClose, children }: SheetProp
     >
       <div
         ref={sheetRef}
-        className="sheet"
+        className={`sheet ${className}`}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         // scroll-edge effect: the sticky header gets its material only once content runs under it
         onScroll={(e) => e.currentTarget.toggleAttribute('data-scrolled', e.currentTarget.scrollTop > 2)}
       >
@@ -129,10 +174,10 @@ export function Sheet({ title, subtitle, leading, onClose, children }: SheetProp
           <div className="sheet-head">
             {leading}
             <div className="titles">
-              <h2>{title}</h2>
+              <h2 id={titleId}>{title}</h2>
               {subtitle && <div className="subtitle">{subtitle}</div>}
             </div>
-            <button type="button" className="close-btn" onClick={dismiss} aria-label="Закрыть">
+            <button type="button" className="close-btn" onClick={dismiss} aria-label="Закрыть" disabled={dismissDisabled}>
               <X size={18} strokeWidth={2.4} />
             </button>
           </div>

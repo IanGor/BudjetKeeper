@@ -30,6 +30,7 @@ export interface Transaction {
 }
 
 export interface Household {
+  distribution_source_id: string | null
   id: string
   name: string
   invite_code: string

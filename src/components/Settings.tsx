@@ -2,7 +2,7 @@ import { Check, ChevronRight, Copy, LogOut } from 'lucide-react'
 import { useState } from 'react'
 import { errorText, supabase } from '../lib/supabase'
 import { setThemePref, useThemePref, type ThemePref } from '../lib/theme'
-import { useBudget } from '../store/budget'
+import { selectKind, useBudget } from '../store/budget'
 import { Orb } from './Coin'
 import { RoundupSettings, roundupSummary } from './RoundupSettings'
 import { Sheet } from './Sheet'
@@ -15,6 +15,8 @@ const THEMES: { value: ThemePref; label: string }[] = [
 
 export function Settings({ onClose }: { onClose(): void }) {
   const household = useBudget((s) => s.household)
+  const setDistributionSource = useBudget((s) => s.setDistributionSource)
+  const [savingSource, setSavingSource] = useState(false)
   const members = useBudget((s) => s.members)
   const userId = useBudget((s) => s.userId)
   const entities = useBudget((s) => s.entities)
@@ -77,6 +79,15 @@ export function Settings({ onClose }: { onClose(): void }) {
       {household && (
         <div className="field">
           <span>Деньги</span>
+          <label className="field"><span>Источник для распределения</span>
+            <select className="input" value={household.distribution_source_id ?? ''} disabled={savingSource} onChange={async (event) => {
+              setSavingSource(true)
+              try { await setDistributionSource(event.target.value || null) } finally { setSavingSource(false) }
+            }}>
+              <option value="">Выбирать при распределении</option>
+              {selectKind(entities, 'account').map((a) => <option value={a.id} key={a.id}>{a.name}</option>)}
+            </select>
+          </label>
           <div className="list">
             <button type="button" className="list-row" onClick={() => setView('roundup')}>
               <span className="main">
