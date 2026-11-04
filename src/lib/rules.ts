@@ -43,6 +43,6 @@ export function roundUpExtra(amount: number, step = ROUNDUP_STEP): number {
  * account or on a category the settings leave out.
  */
 export function roundupApplies(s: RoundupSettings, from: Entity, to: Entity): boolean {
-  if (s.roundup_account_id === null || from.kind !== 'account' || to.kind !== 'expense') return false
+  if (!s.roundup_enabled || s.roundup_account_id === null || from.kind !== 'account' || to.kind !== 'expense') return false
   return from.id !== s.roundup_account_id && !s.roundup_skip_from.includes(from.id) && !s.roundup_skip_to.includes(to.id)
 }

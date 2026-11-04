@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Session } from '@supabase/supabase-js'
 import { errorText, supabase } from '../lib/supabase'
+import { emptyMonthlyBudget, type MonthlyBudget, type Distribution } from '../lib/monthlyBudget'
 import { applyTransaction, monthStart, type Totals } from '../lib/totals'
 import type { Entity, EntityKind, Household, Member, RoundupSettings, Transaction } from '../lib/types'
 
@@ -34,6 +35,7 @@ interface BudgetState {
   entities: Record<string, Entity>
   totals: Totals
   month: string
+  monthlyBudget: MonthlyBudget
   /** bumped on every transaction change so open lists can reload */
   txVersion: number
   toast: string | null
@@ -45,6 +47,10 @@ interface BudgetState {
   retry(): Promise<void>
   loadAll(): Promise<void>
   refreshTotals(): Promise<void>
+  loadMonthlyBudget(): Promise<void>
+  setDistributionSource(id: string | null): Promise<boolean>
+  distribute(id: string, source: string, allocations: Record<string, number>, date: string): Promise<Distribution | { rejected: true } | null>
+  saveMonthlyPlan(month: string, limits: Record<string, number>): Promise<boolean>
   loadMembers(): Promise<void>
   showToast(message: string): void
   clearToast(): void
@@ -92,6 +98,7 @@ export const useBudget = create<BudgetState>((set, get) => {
     entities: {},
     totals: {},
     month: monthStart(),
+    monthlyBudget: emptyMonthlyBudget(),
     txVersion: 0,
     toast: null,
 
@@ -112,7 +119,7 @@ export const useBudget = create<BudgetState>((set, get) => {
 
     async setSession(session) {
       if (!session) {
-        set({ status: 'signedOut', userId: null, household: null, members: [], entities: {}, totals: {} })
+        set({ status: 'signedOut', userId: null, household: null, members: [], entities: {}, totals: {}, monthlyBudget: emptyMonthlyBudget() })
         return
       }
       if (session.user.id === get().userId && get().status === 'ready') return
@@ -143,13 +150,14 @@ export const useBudget = create<BudgetState>((set, get) => {
         }
 
         const hid = me.household_id as string
-        const [h, members, entities, totals] = await Promise.all([
-          supabase.from('households').select('id, name, invite_code, max_members, roundup_account_id, roundup_step, roundup_skip_from, roundup_skip_to').eq('id', hid).single(),
+        const [h, members, entities, totals, monthly] = await Promise.all([
+          supabase.from('households').select('id, name, invite_code, max_members, roundup_enabled, roundup_account_id, roundup_step, roundup_skip_from, roundup_skip_to, distribution_source_id').eq('id', hid).single(),
           supabase.from('household_members').select('household_id, user_id, display_name').eq('household_id', hid),
           supabase.from('entities').select('*').eq('household_id', hid).order('position'),
           supabase.rpc('entity_totals', { p_month: month }),
+          supabase.rpc('monthly_budget_state', { p_month: month }),
         ])
-        const err = h.error ?? members.error ?? entities.error ?? totals.error
+        const err = h.error ?? members.error ?? entities.error ?? totals.error ?? monthly.error
         if (err) return giveUp(err)
 
         set({
@@ -159,6 +167,7 @@ export const useBudget = create<BudgetState>((set, get) => {
           members: members.data as Member[],
           entities: Object.fromEntries((entities.data as Entity[]).map((e) => [e.id, e])),
           totals: toTotals(totals.data),
+          monthlyBudget: monthly.data as MonthlyBudget,
           txVersion: get().txVersion + 1,
         })
       } catch (err) {
@@ -177,7 +186,11 @@ export const useBudget = create<BudgetState>((set, get) => {
           // always the current month: past midnight on the 1st the sums start over
           const month = monthStart()
           const { data, error } = await supabase.rpc('entity_totals', { p_month: month })
-          if (!error) set({ month, totals: toTotals(data) })
+          if (!error) {
+            const monthly = await supabase.rpc('monthly_budget_state', { p_month: month })
+            if (!monthly.error) set({ month, totals: toTotals(data), monthlyBudget: monthly.data as MonthlyBudget })
+            else fail(monthly.error)
+          } else fail(error)
         } while (refreshAgain)
       })()
       try {
@@ -185,6 +198,48 @@ export const useBudget = create<BudgetState>((set, get) => {
       } finally {
         refreshing = null
       }
+    },
+
+    async loadMonthlyBudget() {
+      const { data, error } = await supabase.rpc('monthly_budget_state', { p_month: get().month })
+      if (error) { fail(error); return }
+      set({ monthlyBudget: data as MonthlyBudget })
+    },
+
+    async setDistributionSource(id) {
+      const household = get().household
+      if (!household) return false
+      const { error } = await supabase.from('households').update({ distribution_source_id: id }).eq('id', household.id)
+      if (error) return fail(error)
+      set({ household: { ...get().household!, distribution_source_id: id } })
+      return true
+    },
+
+    async distribute(id, source, allocations, date) {
+      const { data, error } = await supabase.rpc('distribute_budget', { p_id: id, p_source: source, p_allocations: allocations, p_date: date })
+      if (error) {
+        fail(error)
+        // These database errors roll back the whole RPC; amounts can safely be edited.
+        if (['22023', '22P02', '42501', '23514'].includes(error.code)) {
+          await get().refreshTotals()
+          return { rejected: true }
+        }
+        return null
+      }
+      set({ monthlyBudget: { ...get().monthlyBudget, distribution: data as Distribution } })
+      get().bumpTx()
+      await get().refreshTotals()
+      return data as Distribution
+    },
+
+    async saveMonthlyPlan(month, limits) {
+      const hid = get().household?.id
+      if (!hid) return false
+      const { error } = await supabase.rpc('save_monthly_plan', { p_household: hid, p_month: month, p_limits: limits })
+      if (error) return fail(error)
+      set({ monthlyBudget: { ...get().monthlyBudget, next_limits: limits, saved_at: new Date().toISOString() } })
+      await get().loadMonthlyBudget()
+      return true
     },
 
     async loadMembers() {
@@ -226,11 +281,19 @@ export const useBudget = create<BudgetState>((set, get) => {
       const prev = get().entities[id]
       if (!prev) return false
       get().upsertEntityLocal({ ...prev, ...patch })
-      const { error } = await supabase.from('entities').update(patch).eq('id', id)
+      const fields = { ...patch }
+      if (prev.kind === 'expense') delete fields.plan_kopecks
+      const { error } = await supabase.from('entities').update(fields).eq('id', id)
       if (error) {
         get().upsertEntityLocal(prev)
         return fail(error)
       }
+      if (prev.kind === 'expense' && Object.hasOwn(patch, 'plan_kopecks')) {
+        const saved = await supabase.rpc('save_category_limit', { p_entity: id, p_month: monthStart(), p_amount: patch.plan_kopecks })
+        if (saved.error) { await get().loadAll(); return fail(saved.error) }
+        await get().loadMonthlyBudget()
+      }
+      get().upsertEntityLocal({ ...prev, ...fields })
       return true
     },
 

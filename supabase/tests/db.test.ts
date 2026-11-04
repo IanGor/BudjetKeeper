@@ -213,6 +213,32 @@ describe.skipIf(!url || !key || !serviceKey)('database', () => {
     expect(data).toEqual([])
   })
 
+  it('blocks new round-ups while disabled but keeps historical ones and cascading deletion', async () => {
+    const parent = crypto.randomUUID()
+    const round = crypto.randomUUID()
+    expect((await alice.from('transactions').insert([
+      { id: parent, ...tx('Карта', 'Кафе', 1433) },
+      { id: round, ...tx('Карта', 'Наличные', 7), roundup_of: parent },
+    ])).error).toBeNull()
+    expect((await bob.from('households').update({ roundup_enabled: false }).eq('id', hid)).error).toBeNull()
+    expect((await alice.from('transactions').update({ amount_kopecks: 1400 }).eq('id', parent)).error).toBeNull()
+    const history = await alice.from('transactions').select('amount_kopecks').eq('id', round).single()
+    expect(history.data?.amount_kopecks).toBe(7)
+    const blockedParent = crypto.randomUUID()
+    const blocked = await alice.from('transactions').insert([
+      { id: blockedParent, ...tx('Карта', 'Кафе', 1433) },
+      { ...tx('Карта', 'Наличные', 7), roundup_of: blockedParent },
+    ])
+    expect(blocked.error?.message).toMatch(/round-ups are disabled/)
+    expect((await alice.from('transactions').select('id').eq('id', blockedParent)).data).toEqual([])
+    const transfer = crypto.randomUUID()
+    expect((await alice.from('transactions').insert({ id: transfer, ...tx('Карта', 'Наличные', 7) })).error).toBeNull()
+    expect((await alice.from('transactions').update({ roundup_of: parent }).eq('id', transfer)).error?.message).toMatch(/round-ups are disabled/)
+    expect((await alice.from('transactions').delete().eq('id', parent)).error).toBeNull()
+    expect((await alice.from('transactions').select('id').eq('id', round)).data).toEqual([])
+    expect((await alice.from('households').update({ roundup_enabled: true }).eq('id', hid)).error).toBeNull()
+  })
+
   it('does not let anyone sign up', async () => {
     const { error } = await client().auth.signUp({ email: `new-${crypto.randomUUID().slice(0, 8)}@test.local`, password: 'password123' })
     expect(error?.message).toMatch(/signups not allowed|disabled/i)

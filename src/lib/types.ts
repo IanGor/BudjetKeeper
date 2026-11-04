@@ -30,12 +30,14 @@ export interface Transaction {
 }
 
 export interface Household {
+  distribution_source_id: string | null
   id: string
   name: string
   invite_code: string
   max_members: number
   /** account that collects round-ups of spending; null = no round-ups */
   roundup_account_id: string | null
+  roundup_enabled: boolean
   /** rounding step, kopecks */
   roundup_step: number
   /** accounts whose outgoing operations are not rounded */
@@ -44,7 +46,7 @@ export interface Household {
   roundup_skip_to: string[]
 }
 
-export type RoundupSettings = Pick<Household, 'roundup_account_id' | 'roundup_step' | 'roundup_skip_from' | 'roundup_skip_to'>
+export type RoundupSettings = Pick<Household, 'roundup_enabled' | 'roundup_account_id' | 'roundup_step' | 'roundup_skip_from' | 'roundup_skip_to'>
 
 export interface Member {
   household_id: string

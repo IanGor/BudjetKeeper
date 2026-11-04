@@ -5,6 +5,7 @@ import { useDrag } from '../hooks/useCoinDrag'
 import { useFlip } from '../hooks/useFlip'
 import { useMonthRollover } from '../hooks/useMonthRollover'
 import { useRealtime } from '../hooks/useRealtime'
+import { withMonthlyLimits } from '../lib/monthlyBudget'
 import { formatRub } from '../lib/money'
 import type { Entity, EntityKind } from '../lib/types'
 import { useBudget } from '../store/budget'
@@ -12,6 +13,7 @@ import { AmountSheet } from './AmountSheet'
 import { AddTile, Coin, DragGhost } from './Coin'
 import { EntityEditor, EntitySheet } from './EntitySheet'
 import { Feed } from './Feed'
+import { MonthlyBudget } from './MonthlyBudget'
 import { MonthIcon } from './MonthIcon'
 import { PlanBar } from './PlanBar'
 import { Settings } from './Settings'
@@ -46,7 +48,9 @@ function writeFlag(key: string, value: boolean) {
 export function Board() {
   useRealtime()
   useMonthRollover()
-  const entities = useBudget((s) => s.entities)
+  const rawEntities = useBudget((s) => s.entities)
+  const currentLimits = useBudget((s) => s.monthlyBudget.current_limits)
+  const entities = useMemo(() => withMonthlyLimits(rawEntities, currentLimits), [rawEntities, currentLimits])
   const totals = useBudget((s) => s.totals)
   const month = useBudget((s) => s.month)
   const updateEntity = useBudget((s) => s.updateEntity)
@@ -58,6 +62,7 @@ export function Board() {
   const [openedId, setOpenedId] = useState<string | null>(null)
   const [creating, setCreating] = useState<EntityKind | null>(null)
   const [settings, setSettings] = useState(false)
+  const [planning, setPlanning] = useState(false)
   const [feed, setFeed] = useState(false)
   const [incomeOpen, setIncomeOpen] = useState(() => readFlag(INCOME_OPEN_KEY))
 
@@ -137,6 +142,7 @@ export function Board() {
           </button>
         ) : (
           <>
+            <button type="button" className="done-btn" onClick={() => setPlanning(true)}>План</button>
             <button type="button" className="circle-btn" onClick={() => setFeed(true)} aria-label="Все операции">
               <ListOrdered size={18} strokeWidth={2} />
             </button>
@@ -180,6 +186,7 @@ export function Board() {
       {opened && <EntitySheet entity={opened} onClose={() => setOpenedId(null)} />}
       {creating && <EntityEditor kind={creating} onClose={() => setCreating(null)} />}
       {feed && <Feed onClose={() => setFeed(false)} />}
+      {planning && <MonthlyBudget onClose={() => setPlanning(false)} />}
       {settings && <Settings onClose={() => setSettings(false)} />}
     </div>
   )

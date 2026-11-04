@@ -62,7 +62,7 @@ export function RoundupSettings({ onBack, onClose }: { onBack(): void; onClose()
   const live = Object.values(entities).filter((e) => !e.archived)
   const accounts = live.filter((e) => e.kind === 'account')
   const categories = live.filter((e) => e.kind === 'expense')
-  const on = household.roundup_account_id !== null
+  const on = household.roundup_enabled && household.roundup_account_id !== null
 
   return (
     <Sheet
@@ -75,6 +75,12 @@ export function RoundupSettings({ onBack, onClose }: { onBack(): void; onClose()
       }
       onClose={onClose}
     >
+      <label className="switch-row">
+        <span className="main"><span>Округление</span><span className="sub">Для всех участников бюджета</span></span>
+        <input type="checkbox" role="switch" className="switch" checked={household.roundup_enabled}
+          onChange={(e) => void setRoundup({ roundup_enabled: e.target.checked })} />
+      </label>
+      {household.roundup_enabled && <>
       <label className="field">
         <span>Разница приходит на счёт</span>
         <select
@@ -130,6 +136,7 @@ export function RoundupSettings({ onBack, onClose }: { onBack(): void; onClose()
         </>
       )}
       <p className="hint left">Переводы между счетами и доходы не округляются никогда.</p>
+      </>}
     </Sheet>
   )
 }

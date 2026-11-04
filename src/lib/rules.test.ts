@@ -66,7 +66,7 @@ describe('roundUpExtra', () => {
 
 describe('roundupApplies', () => {
   const e = (id: string, kind: EntityKind) => ({ id, kind }) as Entity
-  const base: RoundupSettings = { roundup_account_id: 'save', roundup_step: 1000, roundup_skip_from: [], roundup_skip_to: [] }
+  const base: RoundupSettings = { roundup_enabled: true, roundup_account_id: 'save', roundup_step: 1000, roundup_skip_from: [], roundup_skip_to: [] }
   const card = e('card', 'account')
   const food = e('food', 'expense')
 
@@ -75,6 +75,7 @@ describe('roundupApplies', () => {
     expect(made).toEqual(['account→expense'])
   })
   it('is off without a round-up account and for the round-up account itself', () => {
+    expect(roundupApplies({ ...base, roundup_enabled: false }, card, food)).toBe(false)
     expect(roundupApplies({ ...base, roundup_account_id: null }, card, food)).toBe(false)
     expect(roundupApplies(base, e('save', 'account'), food)).toBe(false)
   })

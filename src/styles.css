@@ -741,3 +741,22 @@ button.list-row:active { background: var(--surface-2); }
 .feed-amt { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .feed-amt.in { color: var(--success); }
 .feed-more { color: var(--muted); text-align: center; padding: 16px 0; font-size: 13px; }
+
+/* Monthly planning extends the existing sheets and form controls. */
+.budget-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.budget-row { padding: 12px 0; border-bottom: 1px solid var(--hairline); }
+.budget-amount { display: grid; grid-template-columns: minmax(0, 1fr) minmax(100px, 35%); gap: 12px; align-items: center; }
+.budget-amount > span { display: flex; align-items: center; gap: 10px; min-width: 0; overflow-wrap: anywhere; }
+.budget-amount .orb { --orb: 32px; flex: none; }
+.budget-amount small { display: block; font-size: 12px; color: var(--muted); line-height: 1.4; }
+.budget-amount input { text-align: right; }
+.budget-remainder { display: block; margin-left: auto; min-height: 40px; font-size: 13px; }
+.budget-summary { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin: 16px 0 8px; font-size: 14px; }
+.budget-summary strong { flex: none; font-size: 17px; font-variant-numeric: tabular-nums; }
+.budget-row input[aria-invalid='true'] { border-color: var(--error); }
+.budget-remainder:disabled { opacity: .45; }
+
+.monthly-budget .hint, .monthly-budget .subtitle, .monthly-budget .budget-amount small { color: var(--text-2); }
+.monthly-budget .link { color: var(--section); }
+.monthly-budget .btn:not(.secondary) { background: var(--section); }
+.monthly-budget :is(button, select):focus-visible { outline: 2px solid var(--section); outline-offset: 2px; }

@@ -27,6 +27,10 @@ export const supabase = createClient(url ?? 'http://localhost:54321', anonKey ??
 /** Human-readable message for Supabase/PostgREST errors raised by our SQL. */
 export function errorText(err: unknown): string {
   const msg = (err as { message?: string })?.message ?? String(err)
+  if (msg.includes('insufficient source balance')) return 'На счете уже недостаточно денег. Обновите суммы и повторите.'
+  if (msg.includes('categories changed')) return 'Список категорий изменился. Откройте план заново.'
+  if (msg.includes('invalid distribution source')) return 'Выберите действующий счет-источник'
+  if (msg.includes('distribution request changed')) return 'Этот запрос уже использован с другими суммами'
   if (msg.includes('Invalid login credentials')) return 'Неверный email или пароль'
   if (msg.includes('User already registered')) return 'Такой пользователь уже есть'
   if (msg.includes('Password should be')) return 'Пароль слишком короткий (минимум 6 символов)'

@@ -20,7 +20,6 @@ export function useRealtime() {
       store().bumpTx()
       void store().refreshTotals()
     }
-    let dropped = false
 
     const channel = supabase
       .channel(`household:${hid}`)
@@ -40,17 +39,18 @@ export function useRealtime() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'household_members', filter }, () =>
         void store().loadMembers(),
       )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'households', filter: `id=eq.${hid}` }, () => void store().loadAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_limits', filter }, () => void store().loadMonthlyBudget())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_plans', filter }, () => void store().loadMonthlyBudget())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_distributions', filter }, () => void store().loadMonthlyBudget())
       // changes are captured only from this point (it arrives after SUBSCRIBED):
       // re-fetch to cover the gap since the initial load
       .on('system', {}, (m: { extension?: string; status?: string }) => {
         if (m.extension === 'postgres_changes' && m.status === 'ok') onTx()
       })
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED' && dropped) {
-          dropped = false
+        if (status === 'SUBSCRIBED') {
           void store().loadAll()
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          dropped = true
         }
       })
 
