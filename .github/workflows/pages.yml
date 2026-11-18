@@ -45,7 +45,7 @@ jobs:
   # Database tests and UI tests on iPhone 14 Pro (WebKit) and OnePlus 8 (Chromium)
   # against a local Supabase stack with the repository's migrations.
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
