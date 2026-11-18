@@ -63,7 +63,9 @@ jobs:
             echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
           } > .env.local
       - run: npm test
-      - run: npx playwright install --with-deps webkit chromium
+      - name: Install Playwright browsers and dependencies
+        timeout-minutes: 10
+        run: npx playwright install --with-deps webkit chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()

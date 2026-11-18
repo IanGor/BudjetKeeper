@@ -276,9 +276,13 @@ test('the feed lists all operations by day, newest first, with the time and the 
 
   await page.getByRole('button', { name: 'Все операции' }).click()
   const feed = page.getByRole('dialog', { name: 'Все операции' })
-  await expect(feed.locator('.feed-day h3').first()).toContainText('Сегодня')
-  const first = feed.locator('.feed-row').first()
-  await expect(first.locator('.feed-time')).toHaveText(/^\d{2}:\d{2}$/)
+  const days = feed.locator('.transaction-day')
+  const firstDay = days.first()
+  const today = await page.evaluate(() => new Intl.DateTimeFormat('sv-SE').format(new Date()))
+  await expect(firstDay.getByRole('heading').locator('time')).toHaveAttribute('datetime', today)
+  await expect(firstDay.locator('.transaction-day-total')).toHaveText(/^−[\d\s]+(?:\.\d{2})?\s₽$/)
+  const first = firstDay.locator('.feed-row').first()
+  await expect(first.locator('time')).toHaveText(/^\d{2}:\d{2}$/)
   await expect(first.locator('.feed-flow')).toContainText('Этот месяц → Еда в городе')
   await expect(first.locator('.feed-amt')).toHaveText(/−1\s433/)
   await expect(first.locator('.feed-round')).toContainText(/Округление \+7\s₽ → Подушка/)
@@ -286,9 +290,9 @@ test('the feed lists all operations by day, newest first, with the time and the 
   await expect(feed.locator('.feed-row', { hasText: 'Этот месяц → Подушка' })).toHaveCount(0)
   expect(await viewportOverflow(page)).toBeLessThanOrEqual(0)
 
-  // days go from the latest back
-  const days = await feed.locator('.feed-day h3').allTextContents()
-  expect(days.length).toBeGreaterThan(0)
+  // Dates are unique and ordered newest first.
+  const dates = await days.locator('h3 time').evaluateAll((times) => times.map((time) => (time as HTMLTimeElement).dateTime))
+  expect(dates).toEqual([...new Set(dates)].sort().reverse())
   await feed.getByRole('button', { name: 'Закрыть ленту' }).click()
   await expect(feed).toBeHidden()
 })
