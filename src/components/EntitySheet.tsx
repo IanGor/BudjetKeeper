@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react'
 import { useOnline } from '../hooks/useOnline'
 import { COLORS, DEFAULT_COLOR, ICON_CHOICES, iconFor } from '../lib/icons'
 import { formatRub, parseRub } from '../lib/money'
+import { transactionDirection } from '../lib/transactionDays'
 import type { Entity, EntityKind, Transaction } from '../lib/types'
 import { useBudget } from '../store/budget'
 import { AmountSheet } from './AmountSheet'
 import { Orb } from './Coin'
 import { Sheet } from './Sheet'
+import { TransactionDays } from './TransactionDays'
 
 const KIND_LABEL: Record<EntityKind, string> = { income: 'Источник дохода', account: 'Счёт', expense: 'Категория' }
 const NEW_LABEL: Record<EntityKind, string> = { income: 'Новый источник', account: 'Новый счёт', expense: 'Новая категория' }
@@ -82,14 +84,15 @@ export function EntitySheet({ entity, onClose }: { entity: Entity; onClose(): vo
       ) : list.length === 0 ? (
         <div className="empty">Операций пока нет</div>
       ) : (
-        <div className="list">
-          {list.map((tx) => {
+        <TransactionDays
+          rows={list}
+          direction={(tx) => transactionDirection(tx, entities, entity)}
+          renderRow={(tx) => {
             const incoming = tx.to_id === entity.id
             const otherId = incoming ? tx.from_id : tx.to_id
             const other = otherId ? entities[otherId] : undefined
-            // money arriving to an account, or income received from a source, is shown as "+"
-            const plus = (incoming && entity.kind === 'account') || entity.kind === 'income'
-            const sub = [formatDate(tx.occurred_at), author(tx.created_by), tx.comment].filter(Boolean).join(' · ')
+            const sign = transactionDirection(tx, entities, entity)
+            const sub = [author(tx.created_by), tx.comment].filter(Boolean).join(' · ')
             return (
               <button key={tx.id} type="button" className="list-row tx" onClick={() => setEditing(tx)}>
                 {other ? (
@@ -101,16 +104,13 @@ export function EntitySheet({ entity, onClose }: { entity: Entity; onClose(): vo
                 )}
                 <div className="main">
                   <div>{otherId ? (other?.name ?? '—') : 'Корректировка'}</div>
-                  <div className="sub">{sub}</div>
+                  {sub && <div className="sub">{sub}</div>}
                 </div>
-                <span className={`amt${plus ? ' in' : ''}`}>
-                  {plus ? '+' : '−'}
-                  {formatRub(tx.amount_kopecks)}
-                </span>
+                <span className={`amt${sign > 0 ? ' in' : ''}`}>{formatRub(sign * tx.amount_kopecks, true)}</span>
               </button>
             )
-          })}
-        </div>
+          }}
+        />
       )}
     </Sheet>
   )
@@ -252,9 +252,4 @@ function EntityForm({ kind, entity, onDone }: { kind: EntityKind; entity?: Entit
       )}
     </form>
   )
-}
-
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  return y === String(new Date().getFullYear()) ? `${d}.${m}` : `${d}.${m}.${y}`
 }

@@ -721,17 +721,20 @@ button.list-row:active { background: var(--surface-2); }
 .feed-head { display: flex; align-items: center; gap: 12px; padding: 8px var(--gutter); }
 .feed-head h2 { margin: 0; font-size: var(--t2); font-weight: 700; letter-spacing: -0.01em; }
 .feed-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 var(--gutter) calc(var(--safe-bottom) + 24px); }
-.feed-day h3 {
-  position: sticky; top: 0; z-index: 1; margin: 0; padding: 14px 0 6px;
-  background: var(--bg); color: var(--section);
-  font-size: 14px; font-weight: 600; text-transform: capitalize;
+.transaction-day + .transaction-day { margin-top: 18px; }
+.transaction-day-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 12px 2px 6px;
 }
+.transaction-day-head h3 { margin: 0; font-size: var(--t1); font-weight: 700; }
+.transaction-day-total { color: var(--text-2); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.feed .transaction-day-head { position: sticky; top: 0; z-index: 1; background: var(--bg); }
+.transaction-day .list-row, .feed-row { min-height: 64px; padding: 10px 2px; border-bottom: 0; }
 .feed-row {
-  display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: baseline;
-  width: 100%; padding: 10px 0; text-align: left; border-bottom: 1px solid var(--hairline);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  width: 100%; text-align: left;
 }
 .feed-row:active { background: var(--surface-2); }
-.feed-time { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); }
 .feed-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .feed-flow { font-size: 15px; overflow-wrap: anywhere; }
 .feed-note, .feed-round { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }

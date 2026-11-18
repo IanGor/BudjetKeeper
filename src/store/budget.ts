@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { errorText, supabase } from '../lib/supabase'
 import { emptyMonthlyBudget, type MonthlyBudget, type Distribution } from '../lib/monthlyBudget'
 import { applyTransaction, monthStart, type Totals } from '../lib/totals'
+import { readThroughDay } from '../lib/transactionDays'
 import type { Entity, EntityKind, Household, Member, RoundupSettings, Transaction } from '../lib/types'
 
 type Status = 'loading' | 'failed' | 'signedOut' | 'onboarding' | 'ready'
@@ -72,7 +73,7 @@ interface BudgetState {
    * A page of the feed of all operations, newest first. Round-ups are not rows of their
    * own: each comes back under the spending it belongs to (`roundups[spending.id]`).
    */
-  fetchFeed(offset: number, limit: number): Promise<{ rows: Transaction[]; roundups: Record<string, Transaction> } | null>
+  fetchFeed(offset: number, limit: number): Promise<{ rows: Transaction[]; hasMore: boolean; roundups: Record<string, Transaction> } | null>
 
   upsertEntityLocal(entity: Entity): void
   removeEntityLocal(id: string): void
@@ -379,46 +380,54 @@ export const useBudget = create<BudgetState>((set, get) => {
     },
 
     async fetchTransactions(entityId) {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select(TX_COLUMNS)
-        .or(`from_id.eq.${entityId},to_id.eq.${entityId}`)
-        .order('occurred_at', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(50)
-      if (error) {
-        fail(error)
-        return []
-      }
-      return data as Transaction[]
+      const page = await readThroughDay(0, 50, async (offset, size) => {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select(TX_COLUMNS)
+          .or(`from_id.eq.${entityId},to_id.eq.${entityId}`)
+          .order('occurred_at', { ascending: false })
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .range(offset, offset + size - 1)
+        if (error) {
+          fail(error)
+          return null
+        }
+        return data as Transaction[]
+      })
+      return page?.rows ?? []
     },
 
     async fetchFeed(offset, limit) {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select(TX_COLUMNS)
-        .is('roundup_of', null)
-        .order('occurred_at', { ascending: false })
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1)
-      if (error) {
-        fail(error)
-        return null
-      }
-      const rows = data as Transaction[]
+      const page = await readThroughDay(offset, limit, async (start, size) => {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select(TX_COLUMNS)
+          .is('roundup_of', null)
+          .order('occurred_at', { ascending: false })
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .range(start, start + size - 1)
+        if (error) {
+          fail(error)
+          return null
+        }
+        return data as Transaction[]
+      })
+      if (!page) return null
       const roundups: Record<string, Transaction> = {}
-      if (rows.length > 0) {
+      for (let i = 0; i < page.rows.length; i += 50) {
         const { data: linked, error: linkError } = await supabase
           .from('transactions')
           .select(TX_COLUMNS)
-          .in('roundup_of', rows.map((r) => r.id))
+          .in('roundup_of', page.rows.slice(i, i + 50).map((r) => r.id))
         if (linkError) {
           fail(linkError)
           return null
         }
         for (const r of linked as Transaction[]) if (r.roundup_of) roundups[r.roundup_of] = r
       }
-      return { rows, roundups }
+      return { ...page, roundups }
     },
 
     upsertEntityLocal(entity) {

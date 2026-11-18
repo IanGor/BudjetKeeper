@@ -1,21 +1,15 @@
 import { ChevronLeft } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatRub } from '../lib/money'
-import { todayISO } from '../lib/totals'
+import { transactionDirection } from '../lib/transactionDays'
 import type { Transaction } from '../lib/types'
 import { useBudget } from '../store/budget'
 import { AmountSheet } from './AmountSheet'
+import { TransactionDays } from './TransactionDays'
 
 const PAGE = 40
 
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-
-function dayLabel(iso: string): string {
-  const today = todayISO()
-  const yesterday = new Date(Date.parse(`${today}T12:00:00`) - 864e5).toISOString().slice(0, 10)
-  const long = new Date(`${iso}T12:00:00`).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
-  return iso === today ? `Сегодня, ${long.split(', ')[1]}` : iso === yesterday ? `Вчера, ${long.split(', ')[1]}` : long
-}
 
 /** Full-screen feed of all operations: days newest first, inside a day the latest record on top. */
 export function Feed({ onClose }: { onClose(): void }) {
@@ -44,7 +38,7 @@ export function Feed({ onClose }: { onClose(): void }) {
       loaded.current = offset + page.rows.length
       setRows((old) => (reload || !old ? page.rows : [...old, ...page.rows]))
       setRoundups((old) => (reload ? page.roundups : { ...old, ...page.roundups }))
-      setMore(page.rows.length === limit)
+      setMore(page.hasMore)
     },
     [fetchFeed],
   )
@@ -72,12 +66,7 @@ export function Feed({ onClose }: { onClose(): void }) {
   const name = (id: string | null) => (id ? (entities[id]?.name ?? '—') : null)
   const author = (id: string | null) => members.find((m) => m.user_id === id)?.display_name
 
-  const days: { day: string; items: Transaction[] }[] = []
-  for (const tx of rows ?? []) {
-    const last = days[days.length - 1]
-    if (last?.day === tx.occurred_at) last.items.push(tx)
-    else days.push({ day: tx.occurred_at, items: [tx] })
-  }
+  const direction = (tx: Transaction) => transactionDirection(tx, entities)
 
   return (
     <div className="feed" role="dialog" aria-label="Все операции">
@@ -93,40 +82,35 @@ export function Feed({ onClose }: { onClose(): void }) {
         ) : rows.length === 0 ? (
           <div className="empty">Операций пока нет</div>
         ) : (
-          days.map(({ day, items }) => (
-            <section key={day} className="feed-day">
-              <h3>{dayLabel(day)}</h3>
-              {items.map((tx) => {
-                const from = entities[tx.from_id ?? '']
-                const to = entities[tx.to_id ?? '']
-                const kind = from?.kind === 'income' ? 'in' : to?.kind === 'expense' ? 'out' : ''
-                const round = roundups[tx.id]
-                const note = [author(tx.created_by), tx.comment].filter(Boolean).join(' · ')
-                return (
-                  <button key={tx.id} type="button" className="feed-row" onClick={() => setEditing(tx)}>
-                    <time className="feed-time" dateTime={tx.created_at}>
-                      {timeOf(tx.created_at)}
-                    </time>
-                    <span className="feed-main">
-                      <span className="feed-flow">
-                        {name(tx.from_id) ?? 'Корректировка'} <span aria-hidden>→</span> {name(tx.to_id) ?? 'Корректировка'}
+          <TransactionDays
+            rows={rows}
+            direction={direction}
+            renderRow={(tx) => {
+              const sign = direction(tx)
+              const round = roundups[tx.id]
+              const note = [author(tx.created_by), tx.comment].filter(Boolean).join(' · ')
+              return (
+                <button key={tx.id} type="button" className="feed-row" onClick={() => setEditing(tx)}>
+                  <span className="feed-main">
+                    <span className="feed-flow">
+                      {name(tx.from_id) ?? 'Корректировка'} <span aria-hidden>→</span> {name(tx.to_id) ?? 'Корректировка'}
+                    </span>
+                    <span className="feed-note">
+                      <time dateTime={tx.created_at}>{timeOf(tx.created_at)}</time>{note && ` · ${note}`}
+                    </span>
+                    {round && (
+                      <span className="feed-round">
+                        Округление +{formatRub(round.amount_kopecks)} → {name(round.to_id)}
                       </span>
-                      {note && <span className="feed-note">{note}</span>}
-                      {round && (
-                        <span className="feed-round">
-                          Округление +{formatRub(round.amount_kopecks)} → {name(round.to_id)}
-                        </span>
-                      )}
-                    </span>
-                    <span className={`feed-amt ${kind}`}>
-                      {kind === 'in' ? '+' : kind === 'out' ? '−' : ''}
-                      {formatRub(tx.amount_kopecks)}
-                    </span>
-                  </button>
-                )
-              })}
-            </section>
-          ))
+                    )}
+                  </span>
+                  <span className={`feed-amt${sign > 0 ? ' in' : ''}`}>
+                    {formatRub(sign === -1 ? -tx.amount_kopecks : tx.amount_kopecks, sign > 0)}
+                  </span>
+                </button>
+              )
+            }}
+          />
         )}
         {more && rows !== null && <div ref={sentinel} className="feed-more">Загрузка…</div>}
       </div>
