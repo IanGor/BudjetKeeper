@@ -4,15 +4,26 @@ import { groupTransactionDays, readThroughDay, transactionDirection } from './tr
 const first = '2026-11-16'
 const second = '2026-11-15'
 const third = '2026-11-14'
-const tx = (day: string, amount: number, from_id = 'account', to_id = 'expense') => ({ occurred_at: day, amount_kopecks: amount, from_id, to_id })
+const tx = (day: string, amount: number, from_id: string | null = 'account', to_id: string | null = 'expense') => ({ occurred_at: day, amount_kopecks: amount, from_id, to_id })
 const entities = { source: { kind: 'income' }, account: { kind: 'account' }, savings: { kind: 'account' }, expense: { kind: 'expense' } } as const
 
 describe('daily transaction totals', () => {
-  it('nets income and spending in kopecks without counting internal transfers in the feed', () => {
-    const rows = [tx(first, 1234), tx(first, 567, 'source', 'account'), tx(first, 9987, 'account', 'savings'), tx(second, 100)]
-    expect(groupTransactionDays(rows, (row) => transactionDirection(row, entities))).toEqual([
-      { day: first, items: rows.slice(0, 3), total: -667 },
-      { day: second, items: rows.slice(3), total: -100 },
+  it('totals only spending and keeps transfers, top-ups and adjustments in the list', () => {
+    const spending = [tx(first, 1234), tx(first, 56)]
+    const other = [
+      tx(first, 567, 'source', 'account'),
+      tx(first, 9987, 'account', 'savings'),
+      tx(first, 4500, null, 'account'),
+      tx(first, 1000, 'account', null),
+      tx(second, 100, 'account', 'savings'),
+    ]
+    const rows = [...spending, ...other]
+    expect(groupTransactionDays(rows, entities)).toEqual([
+      { day: first, items: rows.slice(0, -1), total: -1290 },
+      { day: second, items: rows.slice(-1), total: 0 },
+    ])
+    expect(groupTransactionDays(spending, entities)).toEqual([
+      { day: first, items: spending, total: -1290 },
     ])
   })
 

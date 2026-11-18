@@ -16,7 +16,7 @@ export function transactionDirection(
 }
 
 /** Both histories are already ordered by operation date, then by creation time. */
-export function groupTransactionDays<T extends DayRow>(rows: readonly T[], direction: (row: T) => number) {
+export function groupTransactionDays<T extends DayRow & Flow>(rows: readonly T[], entities: Record<string, Pick<Entity, 'kind'>>) {
   const days: { day: string; items: T[]; total: number }[] = []
   for (const row of rows) {
     let current = days.at(-1)
@@ -25,7 +25,9 @@ export function groupTransactionDays<T extends DayRow>(rows: readonly T[], direc
       days.push(current)
     }
     current.items.push(row)
-    current.total += row.amount_kopecks * direction(row)
+    if (row.from_id && row.to_id && entities[row.from_id]?.kind === 'account' && entities[row.to_id]?.kind === 'expense') {
+      current.total -= row.amount_kopecks
+    }
   }
   return days
 }

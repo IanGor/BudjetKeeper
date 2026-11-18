@@ -86,7 +86,7 @@ export function EntitySheet({ entity, onClose }: { entity: Entity; onClose(): vo
       ) : (
         <TransactionDays
           rows={list}
-          direction={(tx) => transactionDirection(tx, entities, entity)}
+          entities={entities}
           renderRow={(tx) => {
             const incoming = tx.to_id === entity.id
             const otherId = incoming ? tx.from_id : tx.to_id

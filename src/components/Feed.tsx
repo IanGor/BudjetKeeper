@@ -84,7 +84,7 @@ export function Feed({ onClose }: { onClose(): void }) {
         ) : (
           <TransactionDays
             rows={rows}
-            direction={direction}
+            entities={entities}
             renderRow={(tx) => {
               const sign = direction(tx)
               const round = roundups[tx.id]
