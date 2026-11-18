@@ -9,6 +9,7 @@ import { adjustmentFor, todayISO } from '../lib/totals'
 import type { Entity, Transaction } from '../lib/types'
 import { useBudget } from '../store/budget'
 import { Orb } from './Coin'
+import { DateField } from './DateField'
 import { Sheet } from './Sheet'
 
 interface Props {
@@ -127,7 +128,7 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
   // physical keyboard (iPad keyboard, desktop)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return
+      if (e.target instanceof HTMLInputElement || (e.target instanceof HTMLElement && e.target.closest('.date-block'))) return
       if (e.key === 'Enter') {
         e.preventDefault()
         submit()
@@ -218,11 +219,7 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
         )}
       </div>
 
-      <div className="inline">
-        <label className="field">
-          <span>Дата</span>
-          <input className="input" type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} />
-        </label>
+      <DateField value={date} max={todayISO()} onChange={setDate}>
         <label className="field">
           <span>Комментарий</span>
           <input
@@ -234,7 +231,7 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
             onKeyDown={(e) => e.key === 'Enter' && submit()}
           />
         </label>
-      </div>
+      </DateField>
 
       <div className="keypad">
         {KEYS.map((k) => (

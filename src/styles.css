@@ -492,9 +492,7 @@ input, textarea { font: inherit; color: inherit; }
 }
 .input:focus { border-color: var(--accent); background: var(--surface); }
 .input::placeholder { color: var(--muted); }
-/* iOS gives date inputs an intrinsic width wider than half the sheet */
-.input[type='date'] { min-width: 0; -webkit-appearance: none; appearance: none; display: flex; align-items: center; }
-.input[type='date']::-webkit-date-and-time-value { text-align: left; }
+/* date button stands in for the native picker, whose week starts on the browser's Sunday */
 .inline { display: flex; gap: 8px; }
 .inline > * { flex: 1 1 0; min-width: 0; }
 .error { color: var(--error); font-size: 13px; margin: 6px 0 0; }
@@ -757,6 +755,42 @@ button.list-row:active { background: var(--surface-2); }
 .budget-remainder:disabled { opacity: .45; }
 
 .monthly-budget .hint, .monthly-budget .subtitle, .monthly-budget .budget-amount small { color: var(--text-2); }
+
+/* Monday-first date calendar. Sits in the sheet flow so the scrolling sheet can show every row. */
+.date-block { min-width: 0; }
+.date-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  text-align: left; cursor: pointer;
+}
+.date-trigger svg { flex: none; color: var(--muted); }
+.date-trigger.open { border-color: var(--accent); background: var(--surface); }
+.cal {
+  margin: 0 0 8px; padding: 6px 6px 8px;
+  border-radius: 12px; background: var(--surface-2);
+}
+.cal-head { display: flex; align-items: center; justify-content: space-between; min-height: 36px; }
+.cal-head strong { font-size: 15px; font-weight: 650; }
+.cal-nav {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--accent);
+}
+.cal-nav:disabled { opacity: 0.35; }
+.cal-nav:not(:disabled):active { background: var(--surface-press); }
+.cal-week, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.cal-week span {
+  text-align: center; padding: 2px 0 6px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+}
+.cal-day {
+  height: 40px; border-radius: 10px;
+  font-size: 15px; font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.cal-day.out:not(.on) { color: var(--faint); }
+.cal-day.today:not(.on) { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.cal-day.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.cal-day:disabled { color: var(--faint); }
+.cal-day:not(:disabled):not(.on):active { background: var(--surface-press); }
+.cal-day.on:active { background: var(--accent-press); }
 .monthly-budget .link { color: var(--section); }
 .monthly-budget .btn:not(.secondary) { background: var(--section); }
 .monthly-budget :is(button, select):focus-visible { outline: 2px solid var(--section); outline-offset: 2px; }
