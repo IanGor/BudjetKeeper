@@ -1,4 +1,4 @@
-import { ArrowRight, Delete } from 'lucide-react'
+import { ArrowLeftRight, ArrowRight, Delete } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useOnline } from '../hooks/useOnline'
 import { hasOperator, kopecksToInput, pressKey, type Key } from '../lib/keypad'
@@ -48,7 +48,7 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
   const [date, setDate] = useState(tx?.occurred_at ?? todayISO())
   const [comment, setComment] = useState(tx?.comment ?? '')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  // an existing operation can be moved to other accounts / categories
+  // Keep the selected endpoints in the draft, alongside the amount, date and comment.
   const [fromId, setFromId] = useState(fromProp?.id ?? null)
   const [toId, setToId] = useState(toProp?.id ?? null)
   const entities = useBudget((s) => s.entities)
@@ -68,8 +68,10 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(date)
   const delta = balance && amount !== null ? amount - balance.current : 0
   const moved = fromId !== (fromProp?.id ?? null) || toId !== (toProp?.id ?? null)
+  const isTransfer = from?.kind === 'account' && to?.kind === 'account'
+  const validSides = from && to ? from.id !== to.id && canFlow(from.kind, to.kind) : Boolean(tx && (from ?? to)?.kind === 'account' && (!fromId || !toId))
   const valid =
-    dateOk && amount !== null && amount <= MAX_KOPECKS && (balance ? delta !== 0 : amount > 0) && (fromId === null || fromId !== toId)
+    dateOk && amount !== null && amount <= MAX_KOPECKS && (balance ? delta !== 0 : amount > 0 && validSides)
 
   // a new spending or transfer from an account is rounded up to the step of the
   // settings: the target gets the real sum, the difference goes to the round-up account
@@ -84,13 +86,17 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
   const account = balance?.account ?? (isAdjustment ? (from ?? to) : null)
   const title = balance ? 'Баланс счёта' : isAdjustment ? ADJUSTMENT : flowLabel(from!.kind, to!.kind)
 
-  // entities an operation side can be switched to: those the flow rules allow next to the other side
-  const pick = (fromKind: Entity['kind'] | null, toKind: Entity['kind'] | null, only?: Entity['kind']) =>
-    Object.values(entities).filter(
-      (e) =>
-        (e.id === fromId || e.id === toId || !e.archived) &&
-        (only ? e.kind === only : fromKind ? canFlow(fromKind, e.kind) : toKind ? canFlow(e.kind, toKind) : true),
-    )
+  // A new transfer stays between accounts; existing operations keep the usual flow rules.
+  const pick = (side: 'from' | 'to') => {
+    const current = side === 'from' ? fromId : toId
+    const opposite = side === 'from' ? to : from
+    return Object.values(entities).filter((e) => {
+      if (e.id === current) return true
+      if (e.archived || e.id === opposite?.id) return false
+      if (!opposite || !tx) return e.kind === 'account'
+      return side === 'from' ? canFlow(e.kind, opposite.kind) : canFlow(opposite.kind, e.kind)
+    })
+  }
 
   // Totals are updated optimistically by the store, so the sheet closes at once;
   // a failed write is rolled back there and reported with a toast.
@@ -128,7 +134,8 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
   // physical keyboard (iPad keyboard, desktop)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || (e.target instanceof HTMLElement && e.target.closest('.date-block'))) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement ||
+        (e.target instanceof HTMLElement && e.target.closest('.date-block, .flow-swap'))) return
       if (e.key === 'Enter') {
         e.preventDefault()
         submit()
@@ -146,16 +153,22 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
 
   return (
     <Sheet title={title} subtitle={tx ? 'Изменение операции' : undefined} onClose={onClose}>
-      {tx && !balance ? (
+      {tx && isAdjustment ? (
+        <SidePicker label="Счёт" value={(fromId ?? toId)!} options={pick(fromId ? 'from' : 'to')} onChange={fromId ? setFromId : setToId} />
+      ) : !balance && from && to && (tx || isTransfer) ? (
         <div className="inline">
-          {isAdjustment ? (
-            <SidePicker label="Счёт" value={(fromId ?? toId)!} options={pick(null, null, 'account')} onChange={fromId ? setFromId : setToId} />
-          ) : (
-            <>
-              <SidePicker label="Откуда" value={fromId!} options={pick(null, to!.kind)} onChange={setFromId} />
-              <SidePicker label="Куда" value={toId!} options={pick(from!.kind, null)} onChange={setToId} />
-            </>
+          <SidePicker label="Откуда" value={from.id} options={pick('from')} onChange={setFromId} />
+          {isTransfer && !from.archived && !to.archived && (
+            <button
+              type="button"
+              className="input flow-swap"
+              aria-label="Поменять местами"
+              onClick={() => { setFromId(to.id); setToId(from.id) }}
+            >
+              <ArrowLeftRight size={18} aria-hidden="true" />
+            </button>
           )}
+          <SidePicker label="Куда" value={to.id} options={pick('to')} onChange={setToId} />
         </div>
       ) : account ? (
         <div className="flow">

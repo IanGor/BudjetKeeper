@@ -49,6 +49,24 @@ test('expense: drag an account onto a category, type the sum, done', async ({ bo
   await expect(amount).toHaveText(String(before + 150).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f'))
 })
 
+test('change or reverse the accounts of a transfer without losing the draft', async ({ board: page }) => {
+  await dragCoin(page, 'Этот месяц', 'Бэйбик')
+  const sheet = page.getByRole('dialog')
+  const from = sheet.getByRole('combobox', { name: 'Откуда' })
+  const to = sheet.getByRole('combobox', { name: 'Куда', exact: true })
+  const original = await from.inputValue()
+  await sheet.getByRole('button', { name: '7', exact: true }).click()
+  await sheet.getByLabel('Комментарий').fill('Черновик перевода')
+  await from.selectOption({ label: 'Подушка' })
+  const source = await from.inputValue()
+  await to.selectOption(original)
+  await sheet.getByRole('button', { name: 'Поменять местами' }).press('Enter')
+  await expect(from).toHaveValue(original)
+  await expect(to).toHaveValue(source)
+  await expect(sheet.locator('.display .value')).toHaveText('7 ₽')
+  await expect(sheet.getByLabel('Комментарий')).toHaveValue('Черновик перевода')
+})
+
 test('category sheet: operations, then settings', async ({ board: page }) => {
   await page.locator('[data-entity-id]', { hasText: 'Продукты' }).click()
   const sheet = await sheetIsClean(page)

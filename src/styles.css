@@ -495,6 +495,11 @@ input, textarea { font: inherit; color: inherit; }
 /* date button stands in for the native picker, whose week starts on the browser's Sunday */
 .inline { display: flex; gap: 8px; }
 .inline > * { flex: 1 1 0; min-width: 0; }
+.inline > .flow-swap {
+  flex: 0 0 44px; align-self: end; margin-bottom: 12px; padding: 0;
+  display: grid; place-items: center; color: var(--accent); cursor: pointer;
+}
+.flow-swap:active { background: var(--surface-press); }
 .error { color: var(--error); font-size: 13px; margin: 6px 0 0; }
 .hint { color: var(--muted); font-size: 13px; text-align: center; margin: 10px 0 0; line-height: 1.45; }
 .link { color: var(--accent); font-weight: 500; }
