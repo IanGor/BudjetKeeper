@@ -67,6 +67,26 @@ test('change or reverse the accounts of a transfer without losing the draft', as
   await expect(sheet.getByLabel('Комментарий')).toHaveValue('Черновик перевода')
 })
 
+for (const [title, initialFrom, initialTo, nextFrom, nextTo] of [
+  ['Расход', 'Этот месяц', 'Транспорт', 'Подушка', 'Продукты'],
+  ['Доход', 'ЗП Игорь', 'Этот месяц', 'Аванс Игорь', 'Подушка'],
+]) {
+  test(`${title}: change both sides without closing the draft`, async ({ board: page }) => {
+    await dragCoin(page, initialFrom, initialTo)
+    const sheet = page.getByRole('dialog', { name: title, exact: true })
+    const from = sheet.getByRole('combobox', { name: 'Откуда', exact: true })
+    const to = sheet.getByRole('combobox', { name: 'Куда', exact: true })
+    await sheet.getByRole('button', { name: '7', exact: true }).click()
+    await sheet.getByLabel('Комментарий').fill('Черновик операции')
+    await from.selectOption({ label: nextFrom })
+    await to.selectOption({ label: nextTo })
+    await expect(from.locator('option:checked')).toHaveText(nextFrom)
+    await expect(to.locator('option:checked')).toHaveText(nextTo)
+    await expect(sheet.locator('.display .value')).toHaveText('7 ₽')
+    await expect(sheet.getByLabel('Комментарий')).toHaveValue('Черновик операции')
+  })
+}
+
 test('category sheet: operations, then settings', async ({ board: page }) => {
   await page.locator('[data-entity-id]', { hasText: 'Продукты' }).click()
   const sheet = await sheetIsClean(page)
@@ -81,6 +101,11 @@ test('edit a transaction from the history', async ({ board: page }) => {
   const sheet = await sheetIsClean(page)
   await sheet.locator('.list-row').first().click()
   await expect(sheet.getByRole('heading')).toHaveText('Расход')
+  const from = sheet.getByRole('combobox', { name: 'Откуда', exact: true })
+  const to = sheet.getByRole('combobox', { name: 'Куда', exact: true })
+  await expect(from.locator('option', { hasText: 'ЗП Игорь' })).toHaveCount(0)
+  await expect(to.locator('option', { hasText: 'Подушка' })).toHaveCount(0)
+  await expect(to.locator('option', { hasText: 'Продукты' })).toHaveCount(1)
   await sheetIsClean(page)
   await expect(sheet.getByRole('button', { name: 'Удалить операцию' })).toBeVisible()
 })

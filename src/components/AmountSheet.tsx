@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ArrowRight, Delete } from 'lucide-react'
+import { ArrowLeftRight, Delete } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useOnline } from '../hooks/useOnline'
 import { hasOperator, kopecksToInput, pressKey, type Key } from '../lib/keypad'
@@ -69,7 +69,9 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
   const delta = balance && amount !== null ? amount - balance.current : 0
   const moved = fromId !== (fromProp?.id ?? null) || toId !== (toProp?.id ?? null)
   const isTransfer = from?.kind === 'account' && to?.kind === 'account'
-  const validSides = from && to ? from.id !== to.id && canFlow(from.kind, to.kind) : Boolean(tx && (from ?? to)?.kind === 'account' && (!fromId || !toId))
+  const validSides = from && to
+    ? from.id !== to.id && from.kind === fromProp?.kind && to.kind === toProp?.kind && canFlow(from.kind, to.kind)
+    : Boolean(tx && (from ?? to)?.kind === 'account' && (!fromId || !toId))
   const valid =
     dateOk && amount !== null && amount <= MAX_KOPECKS && (balance ? delta !== 0 : amount > 0 && validSides)
 
@@ -86,16 +88,14 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
   const account = balance?.account ?? (isAdjustment ? (from ?? to) : null)
   const title = balance ? 'Баланс счёта' : isAdjustment ? ADJUSTMENT : flowLabel(from!.kind, to!.kind)
 
-  // A new transfer stays between accounts; existing operations keep the usual flow rules.
+  // Keep each picker in its original section, even when editing a saved operation.
   const pick = (side: 'from' | 'to') => {
     const current = side === 'from' ? fromId : toId
-    const opposite = side === 'from' ? to : from
-    return Object.values(entities).filter((e) => {
-      if (e.id === current) return true
-      if (e.archived || e.id === opposite?.id) return false
-      if (!opposite || !tx) return e.kind === 'account'
-      return side === 'from' ? canFlow(e.kind, opposite.kind) : canFlow(opposite.kind, e.kind)
-    })
+    const opposite = side === 'from' ? toId : fromId
+    const kind = (side === 'from' ? fromProp : toProp)?.kind ?? 'account'
+    return Object.values(entities).filter(
+      (e) => e.id === current || (!e.archived && e.id !== opposite && e.kind === kind),
+    )
   }
 
   // Totals are updated optimistically by the store, so the sheet closes at once;
@@ -155,7 +155,7 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
     <Sheet title={title} subtitle={tx ? 'Изменение операции' : undefined} onClose={onClose}>
       {tx && isAdjustment ? (
         <SidePicker label="Счёт" value={(fromId ?? toId)!} options={pick(fromId ? 'from' : 'to')} onChange={fromId ? setFromId : setToId} />
-      ) : !balance && from && to && (tx || isTransfer) ? (
+      ) : !balance && from && to ? (
         <div className="inline">
           <SidePicker label="Откуда" value={from.id} options={pick('from')} onChange={setFromId} />
           {isTransfer && !from.archived && !to.archived && (
@@ -190,21 +190,7 @@ export function AmountSheet({ from: fromProp, to: toProp, tx, balance, onClose }
             )}
           </div>
         </div>
-      ) : (
-        <div className="flow">
-          <div className="side">
-            <Orb entity={from!} />
-            <span>{from!.name}</span>
-          </div>
-          <span className="arrow">
-            <ArrowRight size={18} strokeWidth={2.4} />
-          </span>
-          <div className="side">
-            <Orb entity={to!} />
-            <span>{to!.name}</span>
-          </div>
-        </div>
-      )}
+      ) : null}
 
       <div className="display num" aria-live="polite">
         <span className="expr">{hasOperator(expr) ? expr : balance ? 'Новый баланс' : ''}</span>
